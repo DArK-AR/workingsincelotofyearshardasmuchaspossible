@@ -1539,3 +1539,43 @@ class LogoutUserView(APIView):
         }
 
         return Response(response_content, status=status.HTTP_202_ACCEPTED)
+
+making request
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  // ignore: library_private_types_in_public_api
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  String? upiLink;
+
+  Future<void> initiateUPIPayment() async {
+    final response = await http.post(
+      Uri.parse("http://127.0.0.1:8000/api/create-upi-payment/"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "amount": 1,
+        "customer_name": "joe doe",
+        "customer_phone": "9999999999",
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      setState(() {
+        upiLink = data["upi_link"];
+      });
+    } else {
+      setState(() {
+        upiLink = "Error fetching UPI payment link";
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(   flutter post method
