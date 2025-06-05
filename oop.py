@@ -1311,7 +1311,88 @@ if __name__ == "__main__":
     quick_sort.sort(ascending=True)
     print("Is data sorted (Ascending)?", quick_sort.is_sorted(ascending=True))
 
+# first step
 
+
+import uuid
+from django.db import models
+from django.contrib.auth.models import (
+    AbstractBaseUser, AbstractUser, BaseUserManager
+)
+
+
+def user_profile_picture(instance, filename):
+    image_extension = filename.split('.')[-1]
+    image_name = f'user_profile_picture/{instance.user_uid}/{instance.user_uid}.{image_extension}'
+
+    return image_name
+
+
+class UserManager(BaseUserManager):
+    def create_user(self, username, password=None, **extra_fields):
+        if not username:
+            raise ValueError('User must have a Username')
+
+        user = self.model(username=username)
+        user.set_password(password)
+        user.save(using=self._db)
+
+        return user
+
+    def create_superuser(self, username, password, **extra_fields):
+        user = self.create_user(
+            username, password=password
+        )
+
+        user.is_admin = True
+        user.save(using=self._db)
+
+        return user
+
+
+class User(AbstractBaseUser):
+    user_uid = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False)
+    username = models.CharField(max_length=25, unique=True)
+    profile_picture = models.ImageField(
+        upload_to=user_profile_picture, null=True, blank=True)
+    email_id = models.EmailField(verbose_name='Email ID', unique=True)
+    name = models.CharField(max_length=100)
+    about_me = models.CharField(
+        max_length=256, default="Hey, I'm using this app.")
+    phone_number = models.CharField(max_length=20, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_verified = models.BooleanField(default=False)
+
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    is_admin = models.BooleanField(default=False)
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email_id', 'name']
+
+    def get_full_name(self):
+        full_name = self.name
+        return full_name
+
+    def get_short_name(self):
+        return self.name
+
+    def __str__(self):
+        return self.username
+
+    def has_perm(self, perm):
+        return True
+
+    def has_module_perms(self, app_label):
+        return True
+
+    @property
+    def is_staff(self):
+        return self.is_admin
+
+    objects = UserManager()
 
 #  Serializer User 
 
@@ -1539,43 +1620,1346 @@ class LogoutUserView(APIView):
         }
 
         return Response(response_content, status=status.HTTP_202_ACCEPTED)
+    
+# Bit Manipulation 
+# Optimized technique for handling binary operations.
 
-making request
+class BitManipulation:
+    def __init__(self, number):
+        self.number = number
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+    def set_bit(self, pos):
+        """Sets the bit at a given position."""
+        self.number |= (1 << pos)
 
-  @override
-  // ignore: library_private_types_in_public_api
-  _MyAppState createState() => _MyAppState();
-}
+    def clear_bit(self, pos):
+        """Clears the bit at a given position."""
+        self.number &= ~(1 << pos)
 
-class _MyAppState extends State<MyApp> {
-  String? upiLink;
+    def toggle_bit(self, pos):
+        """Toggles the bit at a given position."""
+        self.number ^= (1 << pos)
 
-  Future<void> initiateUPIPayment() async {
-    final response = await http.post(
-      Uri.parse("http://127.0.0.1:8000/api/create-upi-payment/"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "amount": 1,
-        "customer_name": "joe doe",
-        "customer_phone": "9999999999",
-      }),
-    );
+    def is_bit_set(self, pos):
+        """Checks if a bit at a given position is set."""
+        return (self.number & (1 << pos)) != 0
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      setState(() {
-        upiLink = data["upi_link"];
-      });
-    } else {
-      setState(() {
-        upiLink = "Error fetching UPI payment link";
-      });
-    }
-  }
+    def count_set_bits(self):
+        """Recursively counts the number of set bits using bitwise AND."""
+        return self._count_set_bits_recursive(self.number)
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(   flutter post method
+    def _count_set_bits_recursive(self, num):
+        """Helper function for counting set bits recursively."""
+        if num == 0:
+            return 0
+        return 1 + self._count_set_bits_recursive(num & (num - 1))
+
+    def reverse_bits(self, bit_length=32):
+        """Reverses the bits in the given number considering bit_length."""
+        reversed_num = 0
+        for i in range(bit_length):
+            reversed_num |= ((self.number >> i) & 1) << (bit_length - 1 - i)
+        return reversed_num
+
+    def swap_numbers(self, num1, num2):
+        """Swaps two numbers using XOR without temporary storage."""
+        num1 ^= num2
+        num2 ^= num1
+        num1 ^= num2
+        return num1, num2
+
+    def is_power_of_two(self):
+        """Checks if the number is a power of two."""
+        return self.number > 0 and (self.number & (self.number - 1)) == 0
+
+    def get_number(self):
+        return self.number
+
+    def reset_number(self, new_number):
+        self.number = new_number
+
+
+# Example Usage:
+bit_manip = BitManipulation(29)  # 29 in binary: 11101
+print("Bit 2 is set?", bit_manip.is_bit_set(2))
+bit_manip.toggle_bit(2)
+print("After toggling bit 2:", bit_manip.get_number())
+print("Number of set bits:", bit_manip.count_set_bits())
+print("Reversed Bits:", bin(bit_manip.reverse_bits()))
+print("Is power of two?", bit_manip.is_power_of_two())
+print("Swapped numbers:", bit_manip.swap_numbers(45, 78))
+
+# Dynamic Programming 
+# Solves problems by breaking them into overlapping subproblems.
+
+
+class KnapsackDP:
+    def __init__(self, weights, values, capacity):
+        self.weights = weights
+        self.values = values
+        self.capacity = capacity
+        self.n = len(weights)
+        self.memo = [[-1] * (capacity + 1) for _ in range(self.n)]
+
+    # Memoization (Top-Down Recursive)
+    def knapsack_memo(self, index, remaining_capacity):
+        if index < 0 or remaining_capacity == 0:
+            return 0
+        if self.memo[index][remaining_capacity] != -1:
+            return self.memo[index][remaining_capacity]
+
+        # Case 1: Skip current item
+        exclude_item = self.knapsack_memo(index - 1, remaining_capacity)
+
+        # Case 2: Include current item if it fits
+        include_item = 0
+        if self.weights[index] <= remaining_capacity:
+            include_item = self.values[index] + self.knapsack_memo(index - 1, remaining_capacity - self.weights[index])
+
+        # Store the result
+        self.memo[index][remaining_capacity] = max(include_item, exclude_item)
+        return self.memo[index][remaining_capacity]
+
+    # Tabulation (Bottom-Up Approach)
+    def knapsack_tabulation(self):
+        dp = [[0] * (self.capacity + 1) for _ in range(self.n + 1)]
+
+        for i in range(1, self.n + 1):
+            for w in range(self.capacity + 1):
+                if self.weights[i - 1] <= w:
+                    dp[i][w] = max(dp[i - 1][w], self.values[i - 1] + dp[i - 1][w - self.weights[i - 1]])
+                else:
+                    dp[i][w] = dp[i - 1][w]
+
+        return dp[self.n][self.capacity]
+
+    # Space Optimized DP (Using a single array)
+    def knapsack_space_optimized(self):
+        dp = [0] * (self.capacity + 1)
+
+        for i in range(self.n):
+            for w in range(self.capacity, self.weights[i] - 1, -1):
+                dp[w] = max(dp[w], self.values[i] + dp[w - self.weights[i]])
+
+        return dp[self.capacity]
+
+    def get_optimal_value(self):
+        return {
+            "Memoization Result": self.knapsack_memo(self.n - 1, self.capacity),
+            "Tabulation Result": self.knapsack_tabulation(),
+            "Space Optimized Result": self.knapsack_space_optimized()
+        }
+
+
+# Example Usage:
+weights = [2, 3, 4, 5]
+values = [3, 4, 5, 6]
+capacity = 8
+
+knapsack = KnapsackDP(weights, values, capacity)
+results = knapsack.get_optimal_value()
+
+print("Knapsack Results using DP:")
+for method, value in results.items():
+    print(f"{method}: {value}")
+
+
+# Heap-based Algo 
+# Used for priority queues and finding Kth largest/smallest elements.
+""" 
+Heap Construction (Min-Heap & Maz-Heap)
+Heap Sort Algorithm
+Priority Queue Implementation using Heaps
+Extracting K smallest/Largest Elements using Heaps
+"""
+
+import heapq  # Python's built-in heap library
+
+class HeapAlgorithms:
+    def __init__(self, data):
+        self.data = data
+        self.min_heap = []
+        self.max_heap = []
+
+    # Build Min Heap
+    def build_min_heap(self):
+        """Creates a Min-Heap from data"""
+        self.min_heap = self.data[:]
+        heapq.heapify(self.min_heap)  # Converts list into a valid Min-Heap
+
+    # Build Max Heap (Using Negative Values Trick)
+    def build_max_heap(self):
+        """Creates a Max-Heap from data (Using Negative Values)"""
+        self.max_heap = [-num for num in self.data]
+        heapq.heapify(self.max_heap)
+
+    # Heap Sort (Using Min-Heap)
+    def heap_sort_min(self):
+        """Heap Sort using Min-Heap"""
+        sorted_list = []
+        temp_heap = self.min_heap[:]  # Copy heap to avoid modifying original
+        while temp_heap:
+            sorted_list.append(heapq.heappop(temp_heap))
+        return sorted_list
+
+    # Heap Sort (Using Max-Heap)
+    def heap_sort_max(self):
+        """Heap Sort using Max-Heap"""
+        sorted_list = []
+        temp_heap = self.max_heap[:]  # Copy heap to avoid modifying original
+        while temp_heap:
+            sorted_list.append(-heapq.heappop(temp_heap))  # Convert back to positive
+        return sorted_list
+
+    # Extract K Smallest Elements
+    def extract_k_smallest(self, k):
+        """Extract K smallest elements from heap"""
+        return heapq.nsmallest(k, self.data)
+
+    # Extract K Largest Elements
+    def extract_k_largest(self, k):
+        """Extract K largest elements from heap"""
+        return heapq.nlargest(k, self.data)
+
+    # Priority Queue Implementation (Using Min-Heap)
+    def priority_queue(self):
+        """Simulates a Priority Queue using Min-Heap"""
+        pq = []
+        for num in self.data:
+            heapq.heappush(pq, num)  # Push into Min-Heap (Priority Queue)
+        
+        print("Priority Queue Output:")
+        while pq:
+            print(heapq.heappop(pq), end=" ")  # Pop elements in sorted order
+
+    def display_results(self):
+        """Runs all heap operations and displays results"""
+        self.build_min_heap()
+        self.build_max_heap()
+
+        print("Original Data:", self.data)
+        print("Min-Heap:", self.min_heap)
+        print("Max-Heap:", [-x for x in self.max_heap])  # Convert back to positive
+        print("Heap Sort (Min-Heap):", self.heap_sort_min())
+        print("Heap Sort (Max-Heap):", self.heap_sort_max())
+        print("3 Smallest Elements:", self.extract_k_smallest(3))
+        print("3 Largest Elements:", self.extract_k_largest(3))
+        self.priority_queue()
+
+
+# Example Usage:
+data = [10, 20, 15, 30, 40, 25]
+heap_algo = HeapAlgorithms(data)
+heap_algo.display_results()
+
+
+# Topologial Sorting
+# Used For scheduling tasks with dependencies
+"""
+Graph Class (Encapsulating graph operations)
+Topological Sorting using Kahn's Algorithm (BFS)
+Topological Sorting using DFS
+Displaying the sorted order
+"""
+
+from collections import deque
+
+class Graph:
+    def __init__(self, vertices):
+        self.vertices = vertices
+        self.adj_list = {i: [] for i in range(vertices)}  # Initialize adjacency list
+        self.in_degree = {i: 0 for i in range(vertices)}  # Track in-degree for Kahn's algorithm
+
+    def add_edge(self, u, v):
+        """Adds a directed edge from u -> v"""
+        self.adj_list[u].append(v)
+        self.in_degree[v] += 1
+
+    def topological_sort_bfs(self):
+        """Performs Topological Sort using Kahn's Algorithm (BFS)"""
+        queue = deque()
+        sorted_order = []
+
+        # Add nodes with zero in-degree to the queue
+        for node in self.in_degree:
+            if self.in_degree[node] == 0:
+                queue.append(node)
+
+        while queue:
+            current = queue.popleft()
+            sorted_order.append(current)
+
+            for neighbor in self.adj_list[current]:
+                self.in_degree[neighbor] -= 1
+                if self.in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        if len(sorted_order) == self.vertices:
+            return sorted_order
+        else:
+            return "Cycle detected! Topological sorting not possible."
+
+    def topological_sort_dfs_util(self, node, visited, stack):
+        """DFS helper function for Topological Sorting"""
+        visited[node] = True
+        for neighbor in self.adj_list[node]:
+            if not visited[neighbor]:
+                self.topological_sort_dfs_util(neighbor, visited, stack)
+        stack.append(node)
+
+    def topological_sort_dfs(self):
+        """Performs Topological Sort using DFS"""
+        visited = {i: False for i in range(self.vertices)}
+        stack = []
+
+        for node in range(self.vertices):
+            if not visited[node]:
+                self.topological_sort_dfs_util(node, visited, stack)
+
+        return stack[::-1]  # Reverse for correct ordering
+
+    def display_graph(self):
+        """Displays the adjacency list of the graph"""
+        print("Graph adjacency list:")
+        for node in self.adj_list:
+            print(f"{node} -> {self.adj_list[node]}")
+
+
+# Example usage:
+graph = Graph(6)
+graph.add_edge(5, 2)
+graph.add_edge(5, 0)
+graph.add_edge(4, 0)
+graph.add_edge(4, 1)
+graph.add_edge(2, 3)
+graph.add_edge(3, 1)
+
+graph.display_graph()
+print("Topological Sort using BFS (Kahn’s Algorithm):", graph.topological_sort_bfs())
+print("Topological Sort using DFS:", graph.topological_sort_dfs())
+
+
+# Prim's Algorithm 
+# Another approach for Minimum Spanning Tree
+"""
+Graph Representation and MST Computation in One Class
+Efficient Priority-Based Edge Selection
+Verbose Execution to show Step-by-Step Selection
+Handling Edge Cases Like Unconnected Components
+"""
+
+
+import heapq
+
+class PrimAlgorithm:
+    """Represents a weighted undirected graph and computes the Minimum Spanning Tree (MST) using Prim's Algorithm."""
+    
+    def __init__(self, vertices):
+        """Initialize graph representation with adjacency lists."""
+        self.vertices = vertices
+        self.adj_list = {i: [] for i in range(vertices)}
+        self.visited = [False] * vertices
+        self.mst_edges = []
+    
+    def add_edge(self, u, v, weight):
+        """Add an undirected edge with given weight."""
+        self.adj_list[u].append((v, weight))
+        self.adj_list[v].append((u, weight))
+
+    def compute_mst(self):
+        """Execute Prim's Algorithm to compute the Minimum Spanning Tree."""
+        self._initialize_priority_queue()
+        
+        while self.min_heap:
+            weight, current, parent = heapq.heappop(self.min_heap)
+
+            if self.visited[current]:
+                continue
+            
+            self.visited[current] = True
+            if parent != -1:
+                self.mst_edges.append((parent, current, weight))
+
+            self._process_edges(current)
+
+    def _initialize_priority_queue(self):
+        """Initialize the priority queue with the first node."""
+        self.min_heap = [(0, 0, -1)]  # (Weight, Current Node, Parent Node)
+
+    def _process_edges(self, current):
+        """Push valid edges into the priority queue."""
+        for neighbor, weight in self.adj_list[current]:
+            if not self.visited[neighbor]:
+                heapq.heappush(self.min_heap, (weight, neighbor, current))
+
+    def display_graph(self):
+        """Display the adjacency list representation of the graph."""
+        print("\nGraph Representation:")
+        for node in self.adj_list:
+            print(f"{node}: {self.adj_list[node]}")
+
+    def display_mst(self):
+        """Displays the computed Minimum Spanning Tree."""
+        self.compute_mst()
+        print("\nMinimum Spanning Tree (Prim’s Algorithm):")
+        for u, v, w in self.mst_edges:
+            print(f"Edge {u} -- {v}  (Weight: {w})")
+
+# Example Usage:
+graph = PrimAlgorithm(6)
+graph.add_edge(0, 1, 4)
+graph.add_edge(0, 2, 2)
+graph.add_edge(1, 2, 5)
+graph.add_edge(1, 3, 10)
+graph.add_edge(2, 3, 3)
+graph.add_edge(3, 4, 7)
+graph.add_edge(4, 5, 8)
+graph.add_edge(3, 5, 6)
+
+graph.display_graph()
+graph.display_mst()
+
+
+# Kruskal's Algorithm
+# Finds the Minimum Spanning Tree using Union-Find
+
+
+class KruskalMST:
+    def __init__(self, vertices):
+        self.V = vertices
+        self.result = []
+        self.edges = []
+        self.parent = [i for i in range(self.V)]
+        self.rank = [0] * self.V
+
+    def add_edge(self, u, v, weight):
+        self.edges.append((weight, u, v))
+
+    def find(self, node):
+        if self.parent[node] != node:
+            self.parent[node] = self.find(self.parent[node])
+        return self.parent[node]
+
+    def union(self, u_root, v_root):
+        if self.rank[u_root] < self.rank[v_root]:
+            self.parent[u_root] = v_root
+        elif self.rank[u_root] > self.rank[v_root]:
+            self.parent[v_root] = u_root
+        else:
+            self.parent[v_root] = u_root
+            self.rank[u_root] += 1
+
+    def compute_mst(self):
+        self.edges.sort()
+        num_edges_in_mst = 0
+        i = 0
+        while num_edges_in_mst < self.V - 1 and i < len(self.edges):
+            weight, u, v = self.edges[i]
+            i += 1
+            u_root = self.find(u)
+            v_root = self.find(v)
+            if u_root != v_root:
+                self.result.append((u, v, weight))
+                self.union(u_root, v_root)
+                num_edges_in_mst += 1
+
+    def print_mst(self):
+        print("Edges in the constructed Minimum Spanning Tree:")
+        total_weight = 0
+        for u, v, weight in self.result:
+            print(f"{u} -- {v} == {weight}")
+            total_weight += weight
+        print(f"Total weight of MST: {total_weight}")
+
+if __name__ == "__main__":
+    g = KruskalMST(6)
+    g.add_edge(0, 1, 4)
+    g.add_edge(0, 2, 4)
+    g.add_edge(1, 2, 2)
+    g.add_edge(1, 0, 4)
+    g.add_edge(2, 0, 4)
+    g.add_edge(2, 1, 2)
+    g.add_edge(2, 3, 3)
+    g.add_edge(2, 5, 2)
+    g.add_edge(2, 4, 4)
+    g.add_edge(3, 2, 3)
+    g.add_edge(3, 4, 3)
+    g.add_edge(4, 2, 4)
+    g.add_edge(4, 3, 3)
+    g.add_edge(5, 2, 2)
+    g.add_edge(5, 4, 3)
+    g.compute_mst()
+    g.print_mst()
+
+
+# Floyd-Warshall Algorithm
+# Computes shortest paths between all pairs of nodes
+
+INF = float('inf')
+
+def initialize_distance_matrix(vertices):
+    matrix = []
+    for i in range(vertices):
+        row = []
+        for j in range(vertices):
+            if i == j:
+                row.append(0)
+            else:
+                row.append(INF)
+        matrix.append(row)
+    return matrix
+
+def apply_edges(matrix, edges):
+    for edge in edges:
+        u = edge[0]
+        v = edge[1]
+        weight = edge[2]
+        matrix[u][v] = weight
+
+def floyd_warshall_algorithm(matrix, vertices):
+    for k in range(vertices):
+        for i in range(vertices):
+            for j in range(vertices):
+                if matrix[i][k] != INF and matrix[k][j] != INF:
+                    if matrix[i][j] > matrix[i][k] + matrix[k][j]:
+                        matrix[i][j] = matrix[i][k] + matrix[k][j]
+
+def print_distance_matrix(matrix, vertices):
+    print("Shortest distance matrix:")
+    for i in range(vertices):
+        row_values = []
+        for j in range(vertices):
+            if matrix[i][j] == INF:
+                row_values.append("INF")
+            else:
+                row_values.append(str(matrix[i][j]))
+        print(" ".join(row_values))
+
+def main():
+    vertices = 4
+
+    edges = [
+        (0, 1, 5),
+        (0, 3, 10),
+        (1, 2, 3),
+        (2, 3, 1)
+    ]
+
+    distance_matrix = initialize_distance_matrix(vertices)
+    apply_edges(distance_matrix, edges)
+    floyd_warshall_algorithm(distance_matrix, vertices)
+    print_distance_matrix(distance_matrix, vertices)
+
+if __name__ == "__main__":
+    main()
+
+
+# Bellman-Gord Algorithm 
+#  Solves shortest path problems with negative weights.
+
+INF = float('inf')
+
+def initialize_distances(vertices, source):
+    distances = []
+    for i in range(vertices):
+        if i == source:
+            distances.append(0)
+        else:
+            distances.append(INF)
+    return distances
+
+def relax_edges(vertices, edges, distances):
+    for _ in range(vertices - 1):
+        for edge in edges:
+            u = edge[0]
+            v = edge[1]
+            weight = edge[2]
+            if distances[u] != INF and distances[u] + weight < distances[v]:
+                distances[v] = distances[u] + weight
+
+def detect_negative_cycle(vertices, edges, distances):
+    for edge in edges:
+        u = edge[0]
+        v = edge[1]
+        weight = edge[2]
+        if distances[u] != INF and distances[u] + weight < distances[v]:
+            return True
+    return False
+
+def print_distances(distances, source):
+    print(f"Shortest distances from source vertex {source}:")
+    for i in range(len(distances)):
+        if distances[i] == INF:
+            print(f"Vertex {i}: INF")
+        else:
+            print(f"Vertex {i}: {distances[i]}")
+
+def bellman_ford(vertices, edges, source):
+    distances = initialize_distances(vertices, source)
+    relax_edges(vertices, edges, distances)
+    has_negative_cycle = detect_negative_cycle(vertices, edges, distances)
+    if has_negative_cycle:
+        print("Graph contains a negative weight cycle.")
+    else:
+        print_distances(distances, source)
+
+def main():
+    vertices = 5
+    edges = [
+        (0, 1, -1),
+        (0, 2, 4),
+        (1, 2, 3),
+        (1, 3, 2),
+        (1, 4, 2),
+        (3, 2, 5),
+        (3, 1, 1),
+        (4, 3, -3)
+    ]
+    source = 0
+    bellman_ford(vertices, edges, source)
+
+if __name__ == "__main__":
+    main()
+
+# Dijkstra's Algorithm 
+# Finds teh shortest path in weighted graphs
+
+import heapq
+
+class Dijkstra:
+    def __init__(self, vertices):
+        self.V = vertices
+        self.graph = {i: [] for i in range(vertices)}
+        self.distances = [float('inf')] * vertices
+
+    def add_edge(self, u, v, weight):
+        self.graph[u].append((v, weight))
+
+    def compute(self, source):
+        self.distances = [float('inf')] * self.V
+        self.distances[source] = 0
+
+        priority_queue = []
+        heapq.heappush(priority_queue, (0, source))
+
+        while priority_queue:
+            current_distance, current_vertex = heapq.heappop(priority_queue)
+
+            if current_distance > self.distances[current_vertex]:
+                continue
+
+            for neighbor, weight in self.graph[current_vertex]:
+                distance = current_distance + weight
+                if distance < self.distances[neighbor]:
+                    self.distances[neighbor] = distance
+                    heapq.heappush(priority_queue, (distance, neighbor))
+
+    def get_distances(self):
+        return [None if d == float('inf') else d for d in self.distances]
+
+if __name__ == "__main__":
+    g = Dijkstra(5)
+    g.add_edge(0, 1, 10)
+    g.add_edge(0, 4, 5)
+    g.add_edge(1, 2, 1)
+    g.add_edge(1, 4, 2)
+    g.add_edge(2, 3, 4)
+    g.add_edge(3, 2, 6)
+    g.add_edge(4, 1, 3)
+    g.add_edge(4, 2, 9)
+    g.add_edge(4, 3, 2)
+
+    g.compute(0)
+    print("Shortest distances from node 0:")
+    print(g.get_distances())
+
+
+# Manacher's Algorithm 
+# Finds the longest palindromic substring in linear time
+
+class Manacher:
+    def __init__(self, s):
+        self.original = s
+        self.processed = self._preprocess(s)
+        self.p = [0] * len(self.processed)
+        self.center = 0
+        self.right = 0
+
+    def _preprocess(self, s):
+        return '^#' + '#'.join(s) + '#$'
+
+    def compute(self):
+        for i in range(1, len(self.processed) - 1):
+            mirror = 2 * self.center - i
+
+            if i < self.right:
+                self.p[i] = min(self.right - i, self.p[mirror])
+
+            while self.processed[i + self.p[i] + 1] == self.processed[i - self.p[i] - 1]:
+                self.p[i] += 1
+
+            if i + self.p[i] > self.right:
+                self.center = i
+                self.right = i + self.p[i]
+
+    def longest_palindromic_substring(self):
+        self.compute()
+        max_len = max(self.p)
+        center_index = self.p.index(max_len)
+        start = (center_index - max_len) // 2
+        return self.original[start:start + max_len]
+
+    def get_all_palindromic_lengths(self):
+        return self.p[2:-2:2]  # skip special characters and reduce to original indices
+
+
+if __name__ == "__main__":
+    s = "babad"
+    manacher = Manacher(s)
+    print("Longest palindromic substring:", manacher.longest_palindromic_substring())
+    print("Palindromic lengths at original character positions:", manacher.get_all_palindromic_lengths())
+
+
+# Kadane's Algorithm 
+# Used for finding the maximum sun subarray efficiently
+
+
+class Kadane:
+    def __init__(self, array):
+        self.array = array
+
+    def max_subarray_sum(self):
+        max_sum = current_sum = self.array[0]
+        for num in self.array[1:]:
+            current_sum = max(num, current_sum + num)
+            max_sum = max(max_sum, current_sum)
+        return max_sum
+
+    def max_subarray_with_indices(self):
+        max_sum = current_sum = self.array[0]
+        start = end = temp_start = 0
+        for i in range(1, len(self.array)):
+            if self.array[i] > current_sum + self.array[i]:
+                current_sum = self.array[i]
+                temp_start = i
+            else:
+                current_sum += self.array[i]
+
+            if current_sum > max_sum:
+                max_sum = current_sum
+                start = temp_start
+                end = i
+        return max_sum, start, end, self.array[start:end+1]
+
+if __name__ == "__main__":
+    arr = [-2, 1, -3, 4, -1, 2, 1, -5, 4]
+    kadane = Kadane(arr)
+
+    max_sum = kadane.max_subarray_sum()
+    print("Maximum subarray sum:", max_sum)
+
+    max_sum, start, end, subarray = kadane.max_subarray_with_indices()
+    print(f"Max subarray sum: {max_sum}, from index {start} to {end}")
+    print("Subarray:", subarray)
+
+
+# Monotonic Stack
+# Helps in solving problems related to next greater/smaller elements
+
+class MonotonicStack:
+    def __init__(self, nums):
+        self.nums = nums
+        self.n = len(nums)
+
+    def _init_result(self):
+        return [-1] * self.n, [-1] * self.n
+
+    def next_greater_elements(self):
+        stack = []
+        values, indices = self._init_result()
+
+        for i in range(self.n - 1, -1, -1):
+            current = self.nums[i]
+
+            while stack and self.nums[stack[-1]] <= current:
+                stack.pop()
+
+            if stack:
+                indices[i] = stack[-1]
+                values[i] = self.nums[stack[-1]]
+
+            stack.append(i)
+
+        return values, indices
+
+    def previous_greater_elements(self):
+        stack = []
+        values, indices = self._init_result()
+
+        for i in range(self.n):
+            current = self.nums[i]
+
+            while stack and self.nums[stack[-1]] <= current:
+                stack.pop()
+
+            if stack:
+                indices[i] = stack[-1]
+                values[i] = self.nums[stack[-1]]
+
+            stack.append(i)
+
+        return values, indices
+
+    def next_lesser_elements(self):
+        stack = []
+        values, indices = self._init_result()
+
+        for i in range(self.n - 1, -1, -1):
+            current = self.nums[i]
+
+            while stack and self.nums[stack[-1]] >= current:
+                stack.pop()
+
+            if stack:
+                indices[i] = stack[-1]
+                values[i] = self.nums[stack[-1]]
+
+            stack.append(i)
+
+        return values, indices
+
+    def previous_lesser_elements(self):
+        stack = []
+        values, indices = self._init_result()
+
+        for i in range(self.n):
+            current = self.nums[i]
+
+            while stack and self.nums[stack[-1]] >= current:
+                stack.pop()
+
+            if stack:
+                indices[i] = stack[-1]
+                values[i] = self.nums[stack[-1]]
+
+            stack.append(i)
+
+        return values, indices
+
+    def debug_print_all(self):
+        print("Original array:", self.nums)
+        n_g_vals, n_g_idx = self.next_greater_elements()
+        print("Next Greater Values:  ", n_g_vals)
+        print("Next Greater Indices: ", n_g_idx)
+
+        p_g_vals, p_g_idx = self.previous_greater_elements()
+        print("Previous Greater Values:  ", p_g_vals)
+        print("Previous Greater Indices: ", p_g_idx)
+
+        n_l_vals, n_l_idx = self.next_lesser_elements()
+        print("Next Lesser Values:  ", n_l_vals)
+        print("Next Lesser Indices: ", n_l_idx)
+
+        p_l_vals, p_l_idx = self.previous_lesser_elements()
+        print("Previous Lesser Values:  ", p_l_vals)
+        print("Previous Lesser Indices: ", p_l_idx)
+
+if __name__ == "__main__":
+    nums = [2, 1, 2, 4, 3]
+    ms = MonotonicStack(nums)
+    ms.debug_print_all()
+
+# Fenwick Tree (Binary Indexed Tree)
+# Optimized for cumulative frequency queries.
+
+class FenwickTree:
+    def __init__(self, size):
+        self.n = size
+        self.tree = [0] * (self.n + 1)  # 1-based indexing
+
+    def update(self, index, delta):
+        index += 1  # Convert to 1-based
+        while index <= self.n:
+            self.tree[index] += delta
+            index += index & -index  # Move to parent
+
+    def query(self, index):
+        index += 1  # Convert to 1-based
+        result = 0
+        while index > 0:
+            result += self.tree[index]
+            index -= index & -index  # Move to child
+        return result
+
+    def range_query(self, left, right):
+        return self.query(right) - self.query(left - 1)
+
+    def build_from_list(self, data):
+        for i, val in enumerate(data):
+            self.update(i, val)
+
+    def get_tree(self):
+        return self.tree[1:]  # return internal structure (1-based)
+
+if __name__ == "__main__":
+    data = [3, 2, -1, 6, 5, 4, -3, 3, 7, 2, 3]
+    ft = FenwickTree(len(data))
+    ft.build_from_list(data)
+
+    print("Fenwick Tree internal structure:", ft.get_tree())
+
+    print("Prefix sum [0..5]:", ft.query(5))         # sum of data[0..5]
+    print("Range sum [3..8]:", ft.range_query(3, 8))  # sum of data[3..8]
+
+    print("Updating index 4 (+2)...")
+    ft.update(4, 2)
+    print("New prefix sum [0..5]:", ft.query(5))
+
+# Segment Tree
+# Used for range queries and updates in arrays.
+
+class SegmentTree:
+    def __init__(self, data):
+        self.n = len(data)
+        self.data = data[:]
+        self.tree = [0] * (4 * self.n)  # Enough size for segment tree
+        self._build(0, 0, self.n - 1)
+
+    def _build(self, node, l, r):
+        if l == r:
+            self.tree[node] = self.data[l]
+        else:
+            mid = (l + r) // 2
+            self._build(2 * node + 1, l, mid)
+            self._build(2 * node + 2, mid + 1, r)
+            self.tree[node] = self.tree[2 * node + 1] + self.tree[2 * node + 2]
+
+    def _query(self, node, l, r, ql, qr):
+        if ql > r or qr < l:
+            return 0  # No overlap
+        if ql <= l and r <= qr:
+            return self.tree[node]  # Total overlap
+        mid = (l + r) // 2
+        left_sum = self._query(2 * node + 1, l, mid, ql, qr)
+        right_sum = self._query(2 * node + 2, mid + 1, r, ql, qr)
+        return left_sum + right_sum  # Partial overlap
+
+    def query(self, left, right):
+        if left < 0 or right >= self.n or left > right:
+            raise IndexError("Invalid query range")
+        return self._query(0, 0, self.n - 1, left, right)
+
+    def _update(self, node, l, r, index, value):
+        if l == r:
+            self.tree[node] = value
+            self.data[index] = value
+        else:
+            mid = (l + r) // 2
+            if index <= mid:
+                self._update(2 * node + 1, l, mid, index, value)
+            else:
+                self._update(2 * node + 2, mid + 1, r, index, value)
+            self.tree[node] = self.tree[2 * node + 1] + self.tree[2 * node + 2]
+
+    def update(self, index, value):
+        if index < 0 or index >= self.n:
+            raise IndexError("Index out of bounds")
+        self._update(0, 0, self.n - 1, index, value)
+
+    def get_tree(self):
+        return self.tree[:]
+
+if __name__ == "__main__":
+    arr = [1, 3, 5, 7, 9, 11]
+    st = SegmentTree(arr)
+
+    print("Segment Tree structure:", st.get_tree())
+    print("Sum of values from index 1 to 3:", st.query(1, 3))  # 3 + 5 + 7 = 15
+
+    print("Updating index 1 to value 10...")
+    st.update(1, 10)
+
+    print("Sum of values from index 1 to 3 after update:", st.query(1, 3))  # 10 + 5 + 7 = 22
+
+
+# Trie (Prefix Tree)
+# Efficient For searching words and autocomplete features.
+
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.is_end_of_word = False
+
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert(self, word):
+        current = self.root
+        for char in word:
+            if char not in current.children:
+                current.children[char] = TrieNode()
+            current = current.children[char]
+        current.is_end_of_word = True
+
+    def search(self, word):
+        current = self.root
+        for char in word:
+            if char not in current.children:
+                return False
+            current = current.children[char]
+        return current.is_end_of_word
+
+    def starts_with(self, prefix):
+        current = self.root
+        for char in prefix:
+            if char not in current.children:
+                return False
+            current = current.children[char]
+        return True
+
+    def delete(self, word):
+        def _delete(node, word, depth):
+            if node is None:
+                return False
+
+            if depth == len(word):
+                if not node.is_end_of_word:
+                    return False  # word doesn't exist
+                node.is_end_of_word = False
+                return len(node.children) == 0
+
+            char = word[depth]
+            if char in node.children:
+                should_delete_child = _delete(node.children[char], word, depth + 1)
+
+                if should_delete_child:
+                    del node.children[char]
+                    return not node.is_end_of_word and len(node.children) == 0
+
+            return False
+
+        _delete(self.root, word, 0)
+
+    def collect_all_words(self):
+        def _collect(node, path, words):
+            if node.is_end_of_word:
+                words.append(''.join(path))
+            for char, child in node.children.items():
+                path.append(char)
+                _collect(child, path, words)
+                path.pop()
+
+        words = []
+        _collect(self.root, [], words)
+        return words
+
+
+if __name__ == "__main__":
+    trie = Trie()
+    trie.insert("apple")
+    trie.insert("app")
+    trie.insert("apt")
+    trie.insert("bat")
+    trie.insert("batch")
+
+    print("Search 'app':", trie.search("app"))           # True
+    print("Search 'apple':", trie.search("apple"))       # True
+    print("Search 'ap':", trie.search("ap"))             # False
+    print("Starts with 'ap':", trie.starts_with("ap"))   # True
+    print("Starts with 'ba':", trie.starts_with("ba"))   # True
+    print("Starts with 'cat':", trie.starts_with("cat")) # False
+
+    print("All words in trie:", trie.collect_all_words())  # ['apple', 'app', 'apt', 'bat', 'batch']
+
+    trie.delete("apple")
+    print("After deleting 'apple':", trie.collect_all_words())  # ['app', 'apt', 'bat', 'batch']
+    print("Search 'apple':", trie.search("apple"))  # False
+
+
+# Union-Find (Disjoint Set)
+# Helps in detecting cycles and solving connectivity problems.
+
+
+class UnionFind:
+    def __init__(self, size):
+        self.parent = [i for i in range(size)]
+        self.rank = [0] * size  # Used for union by rank
+
+    def find(self, x):
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])  # Path compression
+        return self.parent[x]
+
+    def union(self, x, y):
+        root_x = self.find(x)
+        root_y = self.find(y)
+
+        if root_x == root_y:
+            return False  # Already in the same set
+
+        # Union by rank
+        if self.rank[root_x] < self.rank[root_y]:
+            self.parent[root_x] = root_y
+        elif self.rank[root_x] > self.rank[root_y]:
+            self.parent[root_y] = root_x
+        else:
+            self.parent[root_y] = root_x
+            self.rank[root_x] += 1
+
+        return True
+
+    def connected(self, x, y):
+        return self.find(x) == self.find(y)
+
+    def get_all_groups(self):
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for node in range(len(self.parent)):
+            root = self.find(node)
+            groups[root].append(node)
+        return list(groups.values())
+
+
+if __name__ == "__main__":
+    uf = UnionFind(10)
+
+    uf.union(0, 1)
+    uf.union(1, 2)
+    uf.union(3, 4)
+    uf.union(5, 6)
+    uf.union(6, 7)
+    uf.union(7, 8)
+
+    print("Are 0 and 2 connected?", uf.connected(0, 2))  # True
+    print("Are 0 and 3 connected?", uf.connected(0, 3))  # False
+    print("All groups after unions:", uf.get_all_groups())
+
+    uf.union(2, 3)  # Now connects 0-1-2 with 3-4
+
+    print("Are 0 and 4 connected after union(2, 3)?", uf.connected(0, 4))  # True
+    print("All groups after more unions:", uf.get_all_groups())
+
+
+# Graph Traversal (BFS & DFS) 
+# Used for exploring graphs, shortest paths, and connectivity
+
+from collections import deque, defaultdict
+
+class Graph:
+    def __init__(self, directed=False):
+        self.adj = defaultdict(list)
+        self.directed = directed
+
+    def add_edge(self, u, v):
+        self.adj[u].append(v)
+        if not self.directed:
+            self.adj[v].append(u)
+
+    def bfs(self, start):
+        visited = set()
+        queue = deque([start])
+        traversal = []
+
+        while queue:
+            node = queue.popleft()
+            if node not in visited:
+                visited.add(node)
+                traversal.append(node)
+                for neighbor in self.adj[node]:
+                    if neighbor not in visited:
+                        queue.append(neighbor)
+        return traversal
+
+    def dfs(self, start):
+        visited = set()
+        traversal = []
+
+        def _dfs(node):
+            visited.add(node)
+            traversal.append(node)
+            for neighbor in self.adj[node]:
+                if neighbor not in visited:
+                    _dfs(neighbor)
+
+        _dfs(start)
+        return traversal
+
+    def bfs_all(self):
+        visited = set()
+        traversal = []
+
+        for node in self.adj:
+            if node not in visited:
+                queue = deque([node])
+                while queue:
+                    current = queue.popleft()
+                    if current not in visited:
+                        visited.add(current)
+                        traversal.append(current)
+                        for neighbor in self.adj[current]:
+                            if neighbor not in visited:
+                                queue.append(neighbor)
+        return traversal
+
+    def dfs_all(self):
+        visited = set()
+        traversal = []
+
+        def _dfs(node):
+            visited.add(node)
+            traversal.append(node)
+            for neighbor in self.adj[node]:
+                if neighbor not in visited:
+                    _dfs(neighbor)
+
+        for node in self.adj:
+            if node not in visited:
+                _dfs(node)
+
+        return traversal
+
+    def show(self):
+        return dict(self.adj)
+
+if __name__ == "__main__":
+    g = Graph(directed=False)
+    g.add_edge(0, 1)
+    g.add_edge(0, 2)
+    g.add_edge(1, 3)
+    g.add_edge(1, 4)
+    g.add_edge(2, 5)
+    g.add_edge(3, 6)
+
+    print("Graph structure:", g.show())
+    print("BFS from node 0:", g.bfs(0))
+    print("DFS from node 0:", g.dfs(0))
+    print("BFS for disconnected graph:", g.bfs_all())
+    print("DFS for disconnected graph:", g.dfs_all())
+
+
+# Divide and Conquer 
+# Breaks problems into smaller subproblems (e.g., Merg Sort, Quick Sort)
+
+class DivideAndConquer:
+    def __init__(self, array):
+        self.array = array
+
+    def max_crossing_sum(self, left, mid, right):
+        left_sum = float('-inf')
+        current_sum = 0
+        max_left = mid
+
+        for i in range(mid, left - 1, -1):
+            current_sum += self.array[i]
+            if current_sum > left_sum:
+                left_sum = current_sum
+                max_left = i
+
+        right_sum = float('-inf')
+        current_sum = 0
+        max_right = mid + 1
+
+        for i in range(mid + 1, right + 1):
+            current_sum += self.array[i]
+            if current_sum > right_sum:
+                right_sum = current_sum
+                max_right = i
+
+        total_sum = left_sum + right_sum
+        return total_sum, max_left, max_right
+
+    def max_subarray_sum(self, left, right):
+        if left == right:
+            return self.array[left], left, right
+
+        mid = (left + right) // 2
+
+        left_sum, left_start, left_end = self.max_subarray_sum(left, mid)
+        right_sum, right_start, right_end = self.max_subarray_sum(mid + 1, right)
+        cross_sum, cross_start, cross_end = self.max_crossing_sum(left, mid, right)
+
+        if left_sum >= right_sum and left_sum >= cross_sum:
+            return left_sum, left_start, left_end
+        elif right_sum >= left_sum and right_sum >= cross_sum:
+            return right_sum, right_start, right_end
+        else:
+            return cross_sum, cross_start, cross_end
+
+    def solve(self):
+        if not self.array:
+            return 0, -1, -1
+        return self.max_subarray_sum(0, len(self.array) - 1)
+
+if __name__ == "__main__":
+    array = [13, -3, -25, 20, -3, -16, -23, 18,
+             20, -7, 12, -5, -22, 15, -4, 7]
+    
+    dac = DivideAndConquer(array)
+    max_sum, start, end = dac.solve()
+    print("Maximum Subarray Sum:", max_sum)
+    print(f"Subarray indices: [{start}:{end}]")
+    print("Subarray:", array[start:end+1])
+
+
+# Backtracking 
+# Used for problems involving permutations, combinations, and constraint satisfaction.
+
+class NQueensBacktracking:
+    def __init__(self, n):
+        self.n = n
+        self.board = [['.' for _ in range(n)] for _ in range(n)]
+        self.solutions = []
+
+    def is_safe(self, row, col):
+        # Check column
+        for r in range(row):
+            if self.board[r][col] == 'Q':
+                return False
+
+        # Check upper-left diagonal
+        r, c = row - 1, col - 1
+        while r >= 0 and c >= 0:
+            if self.board[r][c] == 'Q':
+                return False
+            r -= 1
+            c -= 1
+
+        # Check upper-right diagonal
+        r, c = row - 1, col + 1
+        while r >= 0 and c < self.n:
+            if self.board[r][c] == 'Q':
+                return False
+            r -= 1
+            c += 1
+
+        return True
+
+    def solve_row(self, row=0):
+        if row == self.n:
+            # Found a solution, convert board to list of strings and save
+            solution = [''.join(r) for r in self.board]
+            self.solutions.append(solution)
+            return
+
+        for col in range(self.n):
+            if self.is_safe(row, col):
+                self.board[row][col] = 'Q'
+                self.solve_row(row + 1)
+                self.board[row][col] = '.'  # Backtrack
+
+    def solve(self):
+        self.solve_row()
+        return self.solutions
+
+if __name__ == "__main__":
+    n = 4
+    solver = NQueensBacktracking(n)
+    solutions = solver.solve()
+    print(f"Total solutions for {n}-Queens:", len(solutions))
+    for idx, sol in enumerate(solutions, 1):
+        print(f"Solution {idx}:")
+        for row in sol:
+            print(row)
+        print()
