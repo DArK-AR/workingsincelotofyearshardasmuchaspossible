@@ -2963,3 +2963,2167 @@ if __name__ == "__main__":
         for row in sol:
             print(row)
         print()
+
+
+# Gabow's Algorithm
+
+
+class GabowSCC:
+    def __init__(self, vertices):
+        self.vertices = vertices
+        self.adj_list = {i: [] for i in range(vertices)}
+        self.index_counter = 0
+        self.stack = []
+        self.component_stack = []
+        self.index = [-1] * vertices
+        self.component_map = [-1] * vertices
+        self.sccs = []
+        self.execution_steps = []
+
+    def add_edge(self, u, v):
+        self.adj_list[u].append(v)
+        self.execution_steps.append((u, v, "Added"))
+
+    def compute_sccs(self):
+        for v in range(self.vertices):
+            if self.index[v] == -1:
+                self._dfs(v)
+
+    def _dfs(self, v):
+        self.index[v] = self.index_counter
+        self.index_counter += 1
+        self.stack.append(v)
+        self.component_stack.append(v)
+
+        for neighbor in self.adj_list[v]:
+            if self.index[neighbor] == -1:
+                self._dfs(neighbor)
+            elif self.component_map[neighbor] == -1:
+                while self.index[neighbor] < self.index[self.component_stack[-1]]:
+                    self.component_stack.pop()
+
+        if v == self.component_stack[-1]:
+            self.component_stack.pop()
+            scc = []
+            while True:
+                w = self.stack.pop()
+                self.component_map[w] = len(self.sccs)
+                scc.append(w)
+                if w == v:
+                    break
+            self.sccs.append(scc)
+
+    def get_sccs(self):
+        scc_structure = {}
+        component_sizes = {}
+        
+        for component_id in range(len(self.sccs)):
+            component_nodes = []
+            for node, comp in enumerate(self.component_map):
+                if comp == component_id:
+                    component_nodes.append(node)
+            
+            scc_structure[component_id] = component_nodes
+            component_sizes[component_id] = len(component_nodes)
+        
+        return {
+            "Total_SCCs": len(self.sccs),
+            "SCC_Details": scc_structure,
+            "Component_Sizes": component_sizes
+        }
+
+    def get_graph(self):
+        structured_graph = {"Graph_Nodes": {}}
+        edge_count = 0
+
+        for node in self.adj_list:
+            edges = []
+            for neighbor in self.adj_list[node]:
+                edges.append(neighbor)
+                edge_count += 1
+            
+            structured_graph["Graph_Nodes"][node] = {
+                "Outgoing_Connections": edges,
+                "Total_Outgoing": len(edges)
+            }
+        
+        structured_graph["Total_Edges"] = edge_count
+        structured_graph["Total_Vertices"] = self.vertices
+        
+        return structured_graph
+
+    def get_execution_steps(self):
+        execution_flow = {"Steps": [], "Operation_Count": {}}
+        operation_tracking = {"Edge_Additions": 0, "DFS_Calls": 0, "SCC_Creations": 0}
+
+        for step_id, step in enumerate(self.execution_steps):
+            if step[2] == "Added":
+                operation_tracking["Edge_Additions"] += 1
+                execution_flow["Steps"].append({"Step": step_id, "Action": "Edge Addition", "Nodes": (step[0], step[1])})
+
+        for node in range(self.vertices):
+            if self.index[node] != -1:
+                operation_tracking["DFS_Calls"] += 1
+                execution_flow["Steps"].append({"Step": len(execution_flow["Steps"]), "Action": "DFS Call", "Node": node})
+
+        execution_flow["Operation_Count"] = operation_tracking
+        return execution_flow
+
+
+graph = GabowSCC(5)
+graph.add_edge(0, 1)
+graph.add_edge(1, 2)
+graph.add_edge(2, 0)
+graph.add_edge(2, 3)
+graph.add_edge(3, 4)
+
+graph.compute_sccs()
+
+scc_result = graph.get_sccs()
+graph_data = graph.get_graph()
+execution_log = graph.get_execution_steps()
+
+
+# Decomposition (HLD) Heavy-Light Decomposition
+
+
+class HeavyLightDecomposition:
+    def __init__(self, vertices):
+        self.vertices = vertices
+        self.adj_list = {i: [] for i in range(vertices)}
+        self.parent = [-1] * vertices
+        self.depth = [0] * vertices
+        self.subtree_size = [0] * vertices
+        self.chain_head = [-1] * vertices
+        self.chain_index = [0] * vertices
+        self.position = [-1] * vertices
+        self.current_pos = 0
+        self.segment_tree = [0] * (4 * vertices)
+        self.original_values = [0] * vertices
+
+    def add_edge(self, u, v):
+        self.adj_list[u].append(v)
+        self.adj_list[v].append(u)
+
+    def compute_subtree_sizes(self, node, parent):
+        self.subtree_size[node] = 1
+        self.parent[node] = parent
+        for neighbor in self.adj_list[node]:
+            if neighbor == parent:
+                continue
+            self.depth[neighbor] = self.depth[node] + 1
+            self.compute_subtree_sizes(neighbor, node)
+            self.subtree_size[node] += self.subtree_size[neighbor]
+
+    def decompose(self, node, chain_head):
+        self.chain_head[node] = chain_head
+        self.position[node] = self.current_pos
+        self.current_pos += 1
+        heavy_child = -1
+        max_size = -1
+
+        for neighbor in self.adj_list[node]:
+            if neighbor == self.parent[node]:
+                continue
+            if self.subtree_size[neighbor] > max_size:
+                max_size = self.subtree_size[neighbor]
+                heavy_child = neighbor
+
+        if heavy_child != -1:
+            self.decompose(heavy_child, chain_head)
+
+        for neighbor in self.adj_list[node]:
+            if neighbor == self.parent[node] or neighbor == heavy_child:
+                continue
+            self.decompose(neighbor, neighbor)
+
+    def build_segment_tree(self, start, end, index):
+        if start == end:
+            self.segment_tree[index] = self.original_values[self.position[start]]
+            return
+        mid = (start + end) // 2
+        self.build_segment_tree(start, mid, 2 * index + 1)
+        self.build_segment_tree(mid + 1, end, 2 * index + 2)
+        self.segment_tree[index] = self.segment_tree[2 * index + 1] + self.segment_tree[2 * index + 2]
+
+    def update_segment_tree(self, start, end, index, pos, value):
+        if start == end:
+            self.segment_tree[index] = value
+            return
+        mid = (start + end) // 2
+        if pos <= mid:
+            self.update_segment_tree(start, mid, 2 * index + 1, pos, value)
+        else:
+            self.update_segment_tree(mid + 1, end, 2 * index + 2, pos, value)
+        self.segment_tree[index] = self.segment_tree[2 * index + 1] + self.segment_tree[2 * index + 2]
+
+    def query_segment_tree(self, start, end, index, left, right):
+        if left > end or right < start:
+            return 0
+        if left <= start and right >= end:
+            return self.segment_tree[index]
+        mid = (start + end) // 2
+        left_query = self.query_segment_tree(start, mid, 2 * index + 1, left, right)
+        right_query = self.query_segment_tree(mid + 1, end, 2 * index + 2, left, right)
+        return left_query + right_query
+
+    def path_query(self, u, v):
+        result = 0
+        while self.chain_head[u] != self.chain_head[v]:
+            if self.depth[self.chain_head[u]] < self.depth[self.chain_head[v]]:
+                u, v = v, u
+            start = self.position[self.chain_head[u]]
+            end = self.position[u]
+            result += self.query_segment_tree(0, self.vertices - 1, 0, start, end)
+            u = self.parent[self.chain_head[u]]
+        start = min(self.position[u], self.position[v])
+        end = max(self.position[u], self.position[v])
+        result += self.query_segment_tree(0, self.vertices - 1, 0, start, end)
+        return result
+
+    def get_hierarchy(self):
+        hierarchy = {}
+        for node in range(self.vertices):
+            hierarchy[node] = {
+                "Parent": self.parent[node],
+                "Depth": self.depth[node],
+                "Subtree_Size": self.subtree_size[node],
+                "Chain_Head": self.chain_head[node],
+                "Position": self.position[node]
+            }
+        return hierarchy
+
+    def get_segment_tree(self):
+        return {"Segment_Tree_Data": self.segment_tree, "Total_Nodes": len(self.segment_tree)}
+
+    def get_execution_log(self):
+        log_details = {"Edges_Processed": [], "Tree_Building": {}, "Decomposition_Steps": {}}
+        for node in range(self.vertices):
+            log_details["Edges_Processed"].append(self.adj_list[node])
+            log_details["Tree_Building"][node] = {
+                "Parent": self.parent[node],
+                "Depth": self.depth[node],
+                "Chain_Head": self.chain_head[node]
+            }
+            log_details["Decomposition_Steps"][node] = {
+                "Heavy_Child": max(self.adj_list[node], key=lambda x: self.subtree_size[x], default=-1),
+                "Processed_Position": self.position[node]
+            }
+        return log_details
+
+
+# Example Usage:
+hld = HeavyLightDecomposition(7)
+hld.add_edge(0, 1)
+hld.add_edge(1, 2)
+hld.add_edge(1, 3)
+hld.add_edge(3, 4)
+hld.add_edge(3, 5)
+hld.add_edge(5, 6)
+
+hld.compute_subtree_sizes(0, -1)
+hld.decompose(0, 0)
+
+hierarchy_result = hld.get_hierarchy()
+segment_tree_data = hld.get_segment_tree()
+execution_steps = hld.get_execution_log()
+
+
+# Wavelet-Tree
+
+class WaveletTree:
+    def __init__(self, data, low=None, high=None):
+        self.data = data
+        self.low = min(data) if low is None else low
+        self.high = max(data) if high is None else high
+        self.left = None
+        self.right = None
+        self.bitmap = []
+
+        if self.low == self.high or not data:
+            return
+        
+        mid = (self.low + self.high) // 2
+        left_partition = []
+        right_partition = []
+        
+        for val in data:
+            if val <= mid:
+                self.bitmap.append(0)
+                left_partition.append(val)
+            else:
+                self.bitmap.append(1)
+                right_partition.append(val)
+        
+        if left_partition:
+            self.left = WaveletTree(left_partition, self.low, mid)
+        if right_partition:
+            self.right = WaveletTree(right_partition, mid + 1, self.high)
+
+    def rank(self, value, index):
+        if self.low == self.high:
+            return index
+
+        mid = (self.low + self.high) // 2
+        rank_count = sum(1 for i in range(index) if self.bitmap[i] == (value > mid))
+
+        if value <= mid:
+            return self.left.rank(value, rank_count) if self.left else 0
+        else:
+            return self.right.rank(value, rank_count) if self.right else 0
+
+    def select(self, value, rank):
+        if self.low == self.high:
+            return rank
+        
+        mid = (self.low + self.high) // 2
+        matching_positions = [i for i in range(len(self.bitmap)) if self.bitmap[i] == (value > mid)]
+        
+        if rank >= len(matching_positions):
+            return -1  
+
+        selected_index = matching_positions[rank]
+
+        if value <= mid:
+            return self.left.select(value, rank) if self.left else -1
+        else:
+            return self.right.select(value, rank) if self.right else -1
+
+    def access(self, index):
+        if self.low == self.high:
+            return self.low
+
+        mid = (self.low + self.high) // 2
+        bit_value = self.bitmap[index]
+        rank_index = sum(1 for i in range(index) if self.bitmap[i] == bit_value)
+
+        return self.left.access(rank_index) if bit_value == 0 and self.left else self.right.access(rank_index)
+
+
+# Example Usage:
+data = [3, 5, 2, 8, 5, 7, 6, 1, 4]
+wavelet_tree = WaveletTree(data)
+
+rank_5 = wavelet_tree.rank(5, 6)
+select_5 = wavelet_tree.select(5, 2)
+access_4 = wavelet_tree.access(4)
+
+structured_tree = {
+    "Rank of 5 in first 6 elements": rank_5,
+    "Position of 2nd occurrence of 5": select_5,
+    "Element at index 4": access_4
+}
+
+
+# Range Minimum Query (RMQ)
+
+class RangeMinimumQuery:
+    def __init__(self, arr):
+        """Initialize RMQ with segment tree"""
+        self.n = len(arr)
+        self.arr = arr
+        self.segment_tree = [float("inf")] * (4 * self.n)
+        self.lazy_tree = [0] * (4 * self.n)
+        self._build_segment_tree(0, self.n - 1, 0)
+
+    def _build_segment_tree(self, start, end, index):
+        """Builds the segment tree recursively"""
+        if start == end:
+            self.segment_tree[index] = self.arr[start]
+            return
+        mid = (start + end) // 2
+        self._build_segment_tree(start, mid, 2 * index + 1)
+        self._build_segment_tree(mid + 1, end, 2 * index + 2)
+        self.segment_tree[index] = min(self.segment_tree[2 * index + 1], self.segment_tree[2 * index + 2])
+
+    def _range_query(self, start, end, index, left, right):
+        """Queries the minimum value in a given range"""
+        if left > end or right < start:
+            return float("inf")
+        if left <= start and right >= end:
+            return self.segment_tree[index]
+        mid = (start + end) // 2
+        left_query = self._range_query(start, mid, 2 * index + 1, left, right)
+        right_query = self._range_query(mid + 1, end, 2 * index + 2, left, right)
+        return min(left_query, right_query)
+
+    def _update_segment_tree(self, start, end, index, pos, value):
+        """Updates the segment tree when an element is modified"""
+        if start == end:
+            self.segment_tree[index] = value
+            return
+        mid = (start + end) // 2
+        if pos <= mid:
+            self._update_segment_tree(start, mid, 2 * index + 1, pos, value)
+        else:
+            self._update_segment_tree(mid + 1, end, 2 * index + 2, pos, value)
+        self.segment_tree[index] = min(self.segment_tree[2 * index + 1], self.segment_tree[2 * index + 2])
+
+    def _lazy_propagation(self, start, end, index):
+        """Handles lazy propagation updates"""
+        if self.lazy_tree[index] != 0:
+            self.segment_tree[index] += self.lazy_tree[index]
+            if start != end:
+                self.lazy_tree[2 * index + 1] += self.lazy_tree[index]
+                self.lazy_tree[2 * index + 2] += self.lazy_tree[index]
+            self.lazy_tree[index] = 0
+
+    def range_update(self, start, end, index, left, right, value):
+        """Applies range-based updates lazily"""
+        self._lazy_propagation(start, end, index)
+        if left > end or right < start:
+            return
+        if left <= start and right >= end:
+            self.segment_tree[index] += value
+            if start != end:
+                self.lazy_tree[2 * index + 1] += value
+                self.lazy_tree[2 * index + 2] += value
+            return
+        mid = (start + end) // 2
+        self.range_update(start, mid, 2 * index + 1, left, right, value)
+        self.range_update(mid + 1, end, 2 * index + 2, left, right, value)
+        self.segment_tree[index] = min(self.segment_tree[2 * index + 1], self.segment_tree[2 * index + 2])
+
+    def get_minimum(self, left, right):
+        """Public method for querying RMQ"""
+        return self._range_query(0, self.n - 1, 0, left, right)
+
+    def update(self, pos, value):
+        """Public method for updating segment tree"""
+        self._update_segment_tree(0, self.n - 1, 0, pos, value)
+
+    def get_segment_tree(self):
+        """Structured retrieval of segment tree data"""
+        return {"Segment_Tree": self.segment_tree, "Lazy_Propagation": self.lazy_tree, "Total_Nodes": len(self.segment_tree)}
+
+    def get_execution_log(self):
+        """Returns detailed execution steps tracking"""
+        log_details = {"Tree_Building": {}, "Lazy_Operations": {}, "Updates": {}}
+        for node in range(self.n):
+            log_details["Tree_Building"][node] = {"Original_Value": self.arr[node], "Segment_Tree_Position": node}
+            log_details["Lazy_Operations"][node] = {"Lazy_Value": self.lazy_tree[node]}
+        return log_details
+
+
+# Example Usage:
+arr = [1, 3, 2, 7, 9, 11, 4, 8]
+rmq = RangeMinimumQuery(arr)
+
+query_result = rmq.get_minimum(2, 6)
+rmq.update(3, 5)
+updated_tree = rmq.get_segment_tree()
+execution_steps = rmq.get_execution_log()
+
+
+# Bentley-Ottmann Algorithm
+
+
+import heapq
+
+class BentleyOttmann:
+    def __init__(self, segments):
+        self.segments = segments
+        self.event_queue = []
+        self.active_segments = {}
+        self.intersections = []
+        self._initialize_events()
+        self.execution_steps = []
+
+    def _initialize_events(self):
+        for i, (p1, p2) in enumerate(self.segments):
+            heapq.heappush(self.event_queue, (p1[0], 'start', i, p1, p2))
+            heapq.heappush(self.event_queue, (p2[0], 'end', i, p1, p2))
+            self.execution_steps.append(("Event Added", p1, p2))
+
+    def _find_intersection(self, s1, s2):
+        (x1, y1), (x2, y2) = s1
+        (x3, y3), (x4, y4) = s2
+
+        denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if denominator == 0:
+            return None
+
+        intersect_x = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denominator
+        intersect_y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denominator
+
+        if (min(x1, x2) <= intersect_x <= max(x1, x2) and min(y1, y2) <= intersect_y <= max(y1, y2) and
+                min(x3, x4) <= intersect_x <= max(x3, x4) and min(y3, y4) <= intersect_y <= max(y3, y4)):
+            return (intersect_x, intersect_y)
+        return None
+
+    def _process_event(self, event_type, seg_id, p1, p2):
+        if event_type == "start":
+            self.active_segments[seg_id] = (p1, p2)
+            self.execution_steps.append(("Segment Added", seg_id, p1, p2))
+            neighbors = list(self.active_segments.values())
+
+            for i in range(len(neighbors) - 1):
+                for j in range(i + 1, len(neighbors)):
+                    intersection = self._find_intersection(neighbors[i], neighbors[j])
+                    if intersection:
+                        self.intersections.append(intersection)
+                        self.execution_steps.append(("Intersection Found", neighbors[i], neighbors[j], intersection))
+
+        elif event_type == "end":
+            if seg_id in self.active_segments:
+                del self.active_segments[seg_id]
+                self.execution_steps.append(("Segment Removed", seg_id, p1, p2))
+
+    def process(self):
+        while self.event_queue:
+            x, event_type, seg_id, p1, p2 = heapq.heappop(self.event_queue)
+            self._process_event(event_type, seg_id, p1, p2)
+        return self.intersections
+
+    def get_intersections(self):
+        result = {"Total Intersections": len(self.intersections), "Details": {}}
+        for idx, intersection in enumerate(self.intersections):
+            result["Details"][idx] = {"Intersection Point": intersection, "Segments Involved": []}
+            for seg_id, segment in self.active_segments.items():
+                if self._find_intersection(segment, intersection):
+                    result["Details"][idx]["Segments Involved"].append(seg_id)
+        return result
+
+    def get_active_segments(self):
+        active_details = {"Total Active": len(self.active_segments), "Segment Data": {}}
+        for seg_id, segment in self.active_segments.items():
+            active_details["Segment Data"][seg_id] = {"Start Point": segment[0], "End Point": segment[1]}
+        return active_details
+
+    def get_execution_steps(self):
+        execution_log = {"Total Steps": len(self.execution_steps), "Detailed Steps": {}}
+        step_counter = 0
+        for step in self.execution_steps:
+            execution_log["Detailed Steps"][step_counter] = {"Action": step[0], "Details": step[1:]}
+            step_counter += 1
+        return execution_log
+
+
+# Example Usage:
+segments = [
+    ((0, 0), (5, 5)),
+    ((2, 6), (4, 2)),
+    ((1, 4), (6, 3)),
+    ((3, 0), (3, 7))
+]
+
+bo_algorithm = BentleyOttmann(segments)
+bo_algorithm.process()
+
+intersections_result = bo_algorithm.get_intersections()
+active_segments_result = bo_algorithm.get_active_segments()
+execution_log_result = bo_algorithm.get_execution_steps()
+
+# Z-algorithm
+
+def z_algorithm(s):
+    n = len(s)
+    z = [0] * n
+    left, right = 0, 0
+    execution_steps = []
+
+    print(f"Input string: {s}")
+    print("Initializing Z-array...\n")
+
+    for i in range(1, n):
+        if i <= right:
+            z[i] = min(right - i + 1, z[i - left])
+            execution_steps.append(("Using previously computed Z-value", i, z[i], left, right))
+
+        while i + z[i] < n and s[z[i]] == s[i + z[i]]:
+            z[i] += 1
+            execution_steps.append(("Extending Z-value", i, z[i], left, right))
+
+        if i + z[i] - 1 > right:
+            left, right = i, i + z[i] - 1
+            execution_steps.append(("Updating Left and Right Boundaries", i, left, right))
+
+        print(f"Step {i}: Z[{i}] = {z[i]}, Left = {left}, Right = {right}")
+
+    print("\nExecution Steps Log:")
+    for step in execution_steps:
+        print(step)
+
+    print("\nFinal Z-array:", z)
+    return z
+
+
+def compare_substring_occurrences(text, pattern):
+    combined = pattern + "$" + text
+    z_values = z_algorithm(combined)
+    matches = [i - len(pattern) - 1 for i in range(len(z_values)) if z_values[i] == len(pattern)]
+
+    print("\nPattern Occurrences:")
+    for match in matches:
+        print(f"Pattern found at index {match}")
+
+    return matches
+
+
+def print_execution_summary(execution_steps):
+    print("\nDetailed Execution Summary:")
+    step_count = 1
+    operation_summary = {"Using previously computed Z-value": 0, "Extending Z-value": 0, "Updating Left and Right Boundaries": 0}
+
+    for step in execution_steps:
+        operation_summary[step[0]] += 1
+        print(f"Step {step_count}: {step}")
+        step_count += 1
+
+    print("\nOperations Summary:")
+    for operation, count in operation_summary.items():
+        print(f"{operation}: {count} times")
+
+
+def find_pattern_positions(text, pattern):
+    print("\nFinding occurrences of pattern:", pattern)
+    matches = compare_substring_occurrences(text, pattern)
+
+    print("\nIdentified Pattern Positions:")
+    position_details = {"Pattern": pattern, "Occurrences": matches, "Total Matches": len(matches)}
+    return position_details
+
+
+def validate_pattern(text, pattern):
+    if len(pattern) > len(text):
+        print("\nError: Pattern length is greater than text length!")
+        return False
+    if not pattern or not text:
+        print("\nError: Text or pattern is empty!")
+        return False
+    return True
+
+
+def process_z_algorithm(text, pattern):
+    if not validate_pattern(text, pattern):
+        return None
+
+    print("\nProcessing Z-algorithm for:", text)
+    z_values = z_algorithm(text)
+
+    pattern_positions = find_pattern_positions(text, pattern)
+
+    print("\nFinal Pattern Position Details:")
+    print(pattern_positions)
+
+    return pattern_positions
+
+
+# Example Usage:
+test_string = "abacaba"
+test_pattern = "aba"
+
+process_z_algorithm(test_string, test_pattern)
+
+
+
+# Suffix Tree 
+
+class SuffixTreeNode:
+    def __init__(self):
+        self.children = {}
+        self.start = None
+        self.end = None
+        self.link = None
+
+
+class SuffixTree:
+    def __init__(self, text):
+        self.text = text + "$"  # Append terminal symbol
+        self.root = SuffixTreeNode()
+        self.active_node = self.root
+        self.active_edge = 0
+        self.active_length = 0
+        self.remaining_suffix_count = 0
+        self.end = -1
+        self.last_created_node = None
+        self.build_tree()
+
+    def build_tree(self):
+        for i in range(len(self.text)):
+            self.extend_suffix_tree(i)
+
+    def extend_suffix_tree(self, pos):
+        self.end += 1
+        self.remaining_suffix_count += 1
+        self.last_created_node = None
+
+        while self.remaining_suffix_count > 0:
+            if self.active_length == 0:
+                self.active_edge = pos
+
+            if self.text[self.active_edge] not in self.active_node.children:
+                new_node = SuffixTreeNode()
+                new_node.start = pos
+                new_node.end = self.end
+                self.active_node.children[self.text[self.active_edge]] = new_node
+
+                if self.last_created_node:
+                    self.last_created_node.link = self.active_node
+                    self.last_created_node = None
+            else:
+                next_node = self.active_node.children[self.text[self.active_edge]]
+                edge_length = next_node.end - next_node.start + 1
+
+                if self.active_length >= edge_length:
+                    self.active_edge += edge_length
+                    self.active_length -= edge_length
+                    self.active_node = next_node
+                    continue
+
+                if self.text[next_node.start + self.active_length] == self.text[pos]:
+                    self.active_length += 1
+                    if self.last_created_node:
+                        self.last_created_node.link = self.active_node
+                        self.last_created_node = None
+                    break
+
+                split_node = SuffixTreeNode()
+                split_node.start = next_node.start
+                split_node.end = next_node.start + self.active_length - 1
+                self.active_node.children[self.text[self.active_edge]] = split_node
+
+                next_node.start += self.active_length
+                split_node.children[self.text[next_node.start]] = next_node
+
+                leaf = SuffixTreeNode()
+                leaf.start = pos
+                leaf.end = self.end
+                split_node.children[self.text[pos]] = leaf
+
+                if self.last_created_node:
+                    self.last_created_node.link = split_node
+
+                self.last_created_node = split_node
+
+            self.remaining_suffix_count -= 1
+
+            if self.active_node == self.root and self.active_length > 0:
+                self.active_length -= 1
+                self.active_edge = pos - self.remaining_suffix_count + 1
+            elif self.active_node.link:
+                self.active_node = self.active_node.link
+            else:
+                self.active_node = self.root
+
+    def search(self, pattern):
+        current = self.root
+        i = 0
+
+        while i < len(pattern):
+            if pattern[i] in current.children:
+                node = current.children[pattern[i]]
+                j = node.start
+                while j <= node.end and i < len(pattern) and self.text[j] == pattern[i]:
+                    j += 1
+                    i += 1
+                if j > node.end:
+                    current = node
+                else:
+                    return False
+            else:
+                return False
+        return True
+
+    def get_longest_common_substring(self):
+        stack = [(self.root, 0)]
+        max_length = 0
+        longest_substr = ""
+
+        while stack:
+            node, depth = stack.pop()
+
+            if len(node.children) > 1 and depth > max_length:
+                max_length = depth
+                longest_substr = self.text[node.start:node.start + depth]
+
+            for child in node.children.values():
+                stack.append((child, depth + (child.end - child.start + 1)))
+
+        return longest_substr
+
+
+# Example Usage:
+suffix_tree = SuffixTree("banana")
+print("\nSearching for 'nan':", suffix_tree.search("nan"))
+print("Searching for 'apple':", suffix_tree.search("apple"))
+print("Longest Common Substring:", suffix_tree.get_longest_common_substring())
+
+
+# Persistent Segment Trees
+
+class PersistentSegmentTree:
+    class Node:
+        def __init__(self, value=0, left=None, right=None):
+            self.value = value
+            self.left = left
+            self.right = right
+
+    def __init__(self, size):
+        self.size = size
+        self.roots = [self._build(0, size - 1)]
+
+    def _build(self, start, end):
+        if start == end:
+            return self.Node()
+        mid = (start + end) // 2
+        left_child = self._build(start, mid)
+        right_child = self._build(mid + 1, end)
+        return self.Node(left_child.value + right_child.value, left_child, right_child)
+
+    def update(self, prev_version, pos, value):
+        new_root = self._update(self.roots[prev_version], 0, self.size - 1, pos, value)
+        self.roots.append(new_root)
+
+    def _update(self, node, start, end, pos, value):
+        if start == end:
+            return self.Node(value)
+        mid = (start + end) // 2
+        if pos <= mid:
+            new_left = self._update(node.left, start, mid, pos, value)
+            return self.Node(new_left.value + node.right.value, new_left, node.right)
+        else:
+            new_right = self._update(node.right, mid + 1, end, pos, value)
+            return self.Node(node.left.value + new_right.value, node.left, new_right)
+
+    def query(self, version, left, right):
+        return self._query(self.roots[version], 0, self.size - 1, left, right)
+
+    def _query(self, node, start, end, left, right):
+        if left > end or right < start:
+            return 0
+        if left <= start and right >= end:
+            return node.value
+        mid = (start + end) // 2
+        return self._query(node.left, start, mid, left, right) + self._query(node.right, mid + 1, end, left, right)
+
+    def get_versions_count(self):
+        return len(self.roots)
+
+    def get_structure_at_version(self, version):
+        structure = {}
+        self._traverse(self.roots[version], 0, self.size - 1, structure)
+        return structure
+
+    def _traverse(self, node, start, end, structure):
+        structure[start, end] = node.value
+        if start != end:
+            mid = (start + end) // 2
+            self._traverse(node.left, start, mid, structure)
+            self._traverse(node.right, mid + 1, end, structure)
+
+    def get_execution_log(self):
+        log_details = {"Total_Versions": self.get_versions_count(), "Version_History": {}}
+        for version in range(len(self.roots)):
+            log_details["Version_History"][version] = {"Segment_Tree_Structure": self.get_structure_at_version(version)}
+        return log_details
+
+
+# Example Usage:
+size = 10
+pst = PersistentSegmentTree(size)
+
+pst.update(0, 3, 5)
+pst.update(1, 6, 8)
+pst.update(2, 2, 7)
+
+query_result_1 = pst.query(0, 0, 5)
+query_result_2 = pst.query(1, 3, 7)
+query_result_3 = pst.query(2, 2, 6)
+
+versions_count = pst.get_versions_count()
+structure_at_version_2 = pst.get_structure_at_version(2)
+execution_log_result = pst.get_execution_log()
+
+
+# Dynamic Connectivity Algorithm
+
+
+import random
+
+class UnionFind:
+    def __init__(self, size):
+        self.parent = list(range(size))
+        self.rank = [0] * size
+        self.connected_components = size
+
+    def find(self, node):
+        path_traversed = []
+        while self.parent[node] != node:
+            path_traversed.append(node)
+            node = self.parent[node]
+        for traversed_node in path_traversed:
+            self.parent[traversed_node] = node
+        return node
+
+    def union(self, u, v):
+        root_u = self.find(u)
+        root_v = self.find(v)
+        if root_u != root_v:
+            if self.rank[root_u] > self.rank[root_v]:
+                self.parent[root_v] = root_u
+            elif self.rank[root_u] < self.rank[root_v]:
+                self.parent[root_u] = root_v
+            else:
+                self.parent[root_v] = root_u
+                self.rank[root_u] += 1
+            self.connected_components -= 1
+
+    def connected(self, u, v):
+        return self.find(u) == self.find(v)
+
+    def count_components(self):
+        return self.connected_components
+
+    def get_structure(self):
+        return {"Parents": self.parent, "Ranks": self.rank, "Total Components": self.connected_components}
+
+
+class LinkCutTree:
+    class Node:
+        def __init__(self, value):
+            self.value = value
+            self.parent = None
+            self.left = None
+            self.right = None
+            self.reversed = False
+
+    def __init__(self, size):
+        self.nodes = [self.Node(i) for i in range(size)]
+
+    def find_root(self, node):
+        path = []
+        while self.nodes[node].parent:
+            path.append(node)
+            node = self.nodes[node].parent.value
+        return node
+
+    def link(self, u, v):
+        root_u = self.find_root(u)
+        root_v = self.find_root(v)
+        if root_u != root_v:
+            self.nodes[root_u].parent = self.nodes[root_v]
+
+    def cut(self, u, v):
+        if self.nodes[u].parent == self.nodes[v]:
+            self.nodes[u].parent = None
+        elif self.nodes[v].parent == self.nodes[u]:
+            self.nodes[v].parent = None
+
+    def connected(self, u, v):
+        return self.find_root(u) == self.find_root(v)
+
+    def get_tree_structure(self):
+        tree_representation = {}
+        for node in self.nodes:
+            tree_representation[node.value] = {
+                "Parent": node.parent.value if node.parent else None,
+                "Left Child": node.left.value if node.left else None,
+                "Right Child": node.right.value if node.right else None
+            }
+        return tree_representation
+
+
+class DynamicConnectivity:
+    def __init__(self, size):
+        self.union_find = UnionFind(size)
+        self.link_cut_tree = LinkCutTree(size)
+        self.execution_log = []
+
+    def add_edge(self, u, v):
+        self.union_find.union(u, v)
+        self.link_cut_tree.link(u, v)
+        self.execution_log.append(("Added Edge", u, v))
+
+    def remove_edge(self, u, v):
+        self.link_cut_tree.cut(u, v)
+        self.execution_log.append(("Removed Edge", u, v))
+
+    def query_connected(self, u, v):
+        result = self.union_find.connected(u, v) or self.link_cut_tree.connected(u, v)
+        self.execution_log.append(("Connectivity Check", u, v, result))
+        return result
+
+    def total_components(self):
+        component_count = self.union_find.count_components()
+        self.execution_log.append(("Total Components", component_count))
+        return component_count
+
+    def get_execution_log(self):
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+    def get_full_structure(self):
+        return {
+            "Union-Find Structure": self.union_find.get_structure(),
+            "Link-Cut Tree Structure": self.link_cut_tree.get_tree_structure(),
+            "Execution History": self.execution_log
+        }
+
+
+# Example Usage:
+dc = DynamicConnectivity(10)
+
+edges = [(random.randint(0, 9), random.randint(0, 9)) for _ in range(7)]
+for u, v in edges:
+    dc.add_edge(u, v)
+
+print("Connected (0, 1):", dc.query_connected(0, 1))
+print("Connected (2, 7):", dc.query_connected(2, 7))
+
+dc.remove_edge(edges[2][0], edges[2][1])
+
+print("Connected (2, 7) after removal:", dc.query_connected(2, 7))
+print("Total Components:", dc.total_components())
+
+execution_log = dc.get_execution_log()
+full_structure = dc.get_full_structure()
+
+
+
+# Chained Hash table
+
+
+class HashNode:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+        self.next = None
+
+class ChainedHashTable:
+    def __init__(self, initial_capacity=10):
+        self.capacity = initial_capacity
+        self.size = 0
+        self.table = [None] * self.capacity
+        self.execution_log = []
+
+    def _hash(self, key):
+        return hash(key) % self.capacity
+
+    def insert(self, key, value):
+        index = self._hash(key)
+        node = self.table[index]
+        
+        if node is None:
+            self.table[index] = HashNode(key, value)
+            self.size += 1
+            self.execution_log.append(("Inserted", key, value))
+            return
+
+        prev = None
+        while node:
+            if node.key == key:
+                node.value = value
+                self.execution_log.append(("Updated", key, value))
+                return
+            prev = node
+            node = node.next
+        
+        prev.next = HashNode(key, value)
+        self.size += 1
+        self.execution_log.append(("Inserted at Chain", key, value))
+
+    def search(self, key):
+        index = self._hash(key)
+        node = self.table[index]
+        
+        while node:
+            if node.key == key:
+                self.execution_log.append(("Search Found", key, node.value))
+                return node.value
+            node = node.next
+        
+        self.execution_log.append(("Search Not Found", key))
+        return None
+
+    def delete(self, key):
+        index = self._hash(key)
+        node = self.table[index]
+        prev = None
+
+        while node:
+            if node.key == key:
+                if prev:
+                    prev.next = node.next
+                else:
+                    self.table[index] = node.next
+                self.size -= 1
+                self.execution_log.append(("Deleted", key))
+                return True
+            prev = node
+            node = node.next
+
+        self.execution_log.append(("Deletion Failed", key))
+        return False
+
+    def resize(self):
+        old_table = self.table
+        self.capacity *= 2
+        self.table = [None] * self.capacity
+        self.size = 0
+        self.execution_log.append(("Resized Table", self.capacity))
+
+        for node in old_table:
+            while node:
+                self.insert(node.key, node.value)
+                node = node.next
+
+    def load_factor(self):
+        return self.size / self.capacity
+
+    def check_resize(self):
+        if self.load_factor() > 0.7:
+            self.resize()
+
+    def get_structure(self):
+        structure = {}
+        for i, node in enumerate(self.table):
+            chain = []
+            while node:
+                chain.append((node.key, node.value))
+                node = node.next
+            structure[i] = chain
+        return structure
+
+    def get_execution_log(self):
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+
+# Example Usage:
+hash_table = ChainedHashTable()
+
+keys = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew"]
+values = [5, 3, 7, 6, 2, 8, 1, 4]
+
+for k, v in zip(keys, values):
+    hash_table.insert(k, v)
+    hash_table.check_resize()
+
+print("\nSearch 'banana':", hash_table.search("banana"))
+print("Search 'mango':", hash_table.search("mango"))
+
+hash_table.delete("cherry")
+print("Search after deletion 'cherry':", hash_table.search("cherry"))
+
+print("\nHash Table Structure:", hash_table.get_structure())
+print("\nExecution Log:", hash_table.get_execution_log())
+
+
+# Double ended Queue 
+
+
+class Node:
+    def __init__(self, value):
+        self.value = value
+        self.next = None
+        self.prev = None
+
+class Deque:
+    def __init__(self):
+        self.front = None
+        self.rear = None
+        self.size = 0
+        self.execution_log = []
+
+    def is_empty(self):
+        return self.size == 0
+
+    def add_front(self, value):
+        new_node = Node(value)
+        if self.is_empty():
+            self.front = self.rear = new_node
+        else:
+            new_node.next = self.front
+            self.front.prev = new_node
+            self.front = new_node
+        self.size += 1
+        self.execution_log.append(("Added Front", value))
+
+    def add_rear(self, value):
+        new_node = Node(value)
+        if self.is_empty():
+            self.front = self.rear = new_node
+        else:
+            new_node.prev = self.rear
+            self.rear.next = new_node
+            self.rear = new_node
+        self.size += 1
+        self.execution_log.append(("Added Rear", value))
+
+    def remove_front(self):
+        if self.is_empty():
+            return None
+        value = self.front.value
+        self.front = self.front.next
+        if self.front:
+            self.front.prev = None
+        else:
+            self.rear = None
+        self.size -= 1
+        self.execution_log.append(("Removed Front", value))
+        return value
+
+    def remove_rear(self):
+        if self.is_empty():
+            return None
+        value = self.rear.value
+        self.rear = self.rear.prev
+        if self.rear:
+            self.rear.next = None
+        else:
+            self.front = None
+        self.size -= 1
+        self.execution_log.append(("Removed Rear", value))
+        return value
+
+    def peek_front(self):
+        if self.is_empty():
+            self.execution_log.append(("Peek Front Failed", "Deque is Empty"))
+            return None
+        self.execution_log.append(("Peek Front", self.front.value))
+        return self.front.value
+
+    def peek_rear(self):
+        if self.is_empty():
+            self.execution_log.append(("Peek Rear Failed", "Deque is Empty"))
+            return None
+        self.execution_log.append(("Peek Rear", self.rear.value))
+        return self.rear.value
+
+    def get_size(self):
+        size_details = {
+            "Current Size": self.size,
+            "Deque Empty": self.is_empty(),
+            "Front Value": self.peek_front(),
+            "Rear Value": self.peek_rear()
+        }
+        self.execution_log.append(("Size Checked", size_details))
+        return size_details
+
+    def reverse_deque(self):
+        current = self.front
+        while current:
+            current.next, current.prev = current.prev, current.next
+            current = current.prev
+        self.front, self.rear = self.rear, self.front
+        self.execution_log.append(("Reversed Deque",))
+
+    def contains(self, value):
+        current = self.front
+        while current:
+            if current.value == value:
+                self.execution_log.append(("Found", value))
+                return True
+            current = current.next
+        self.execution_log.append(("Not Found", value))
+        return False
+
+    def display(self):
+        elements = []
+        current = self.front
+        while current:
+            elements.append(current.value)
+            current = current.next
+        self.execution_log.append(("Displayed Deque", elements))
+        return elements
+
+    def get_execution_log(self):
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+
+# Example Usage:
+dq = Deque()
+
+dq.add_front(10)
+dq.add_front(20)
+dq.add_rear(30)
+dq.add_rear(40)
+
+print("\nDeque Elements:", dq.display())
+print("Front Element:", dq.peek_front())
+print("Rear Element:", dq.peek_rear())
+
+dq.remove_front()
+dq.remove_rear()
+
+print("\nDeque Elements after removals:", dq.display())
+print("Size of Deque:", dq.get_size())
+
+dq.add_front(50)
+dq.add_rear(60)
+dq.reverse_deque()
+
+print("\nDeque Elements after reversing:", dq.display())
+
+print("\nChecking if '30' exists in Deque:", dq.contains(30))
+print("\nExecution Log:", dq.get_execution_log())
+
+
+# Van Emde Boas Tree
+
+class VanEmdeBoas:
+    def __init__(self, universe_size):
+        self.u = universe_size
+        self.min = None
+        self.max = None
+
+        if universe_size <= 2:
+            self.summary = None
+            self.cluster = None
+        else:
+            sqrt_u = int(universe_size ** 0.5)
+            self.summary = VanEmdeBoas(sqrt_u)
+            self.cluster = [VanEmdeBoas(sqrt_u) for _ in range(sqrt_u)]
+
+    def high(self, x):
+        if x < 0 or x >= self.u:
+            raise ValueError(f"Value {x} is out of bounds for universe size {self.u}")
+        
+        root_size = int(self.u ** 0.5)
+        high_value = x // root_size
+
+        tracking_data = {
+            "Input": x,
+            "Computed Root Size": root_size,
+            "High Value": high_value
+        }
+
+        return high_value, tracking_data
+
+    def low(self, x):
+        if x < 0 or x >= self.u:
+            raise ValueError(f"Value {x} is out of bounds for universe size {self.u}")
+        
+        root_size = int(self.u ** 0.5)
+        low_value = x % root_size
+
+        tracking_data = {
+            "Input": x,
+            "Computed Root Size": root_size,
+            "Low Value": low_value
+        }
+
+        return low_value, tracking_data
+
+    def index(self, high, low):
+        if high < 0 or low < 0 or high >= int(self.u ** 0.5) or low >= int(self.u ** 0.5):
+            raise ValueError(f"Invalid index computation with high={high}, low={low} for universe {self.u}")
+
+        root_size = int(self.u ** 0.5)
+        computed_index = high * root_size + low
+
+        tracking_data = {
+            "High Component": high,
+            "Low Component": low,
+            "Computed Root Size": root_size,
+            "Final Index": computed_index
+        }
+
+        return computed_index, tracking_data
+
+    def insert(self, x):
+        if self.min is None:
+            self.min = self.max = x
+        else:
+            if x < self.min:
+                x, self.min = self.min, x
+            if x > self.max:
+                self.max = x
+            
+            if self.u > 2:
+                high_x, high_tracking = self.high(x)
+                low_x, low_tracking = self.low(x)
+
+                if self.cluster[high_x].min is None:
+                    self.summary.insert(high_x)
+                    self.cluster[high_x].insert(low_x)
+                else:
+                    self.cluster[high_x].insert(low_x)
+
+    def contains(self, x):
+        if x == self.min or x == self.max:
+            return True
+        elif self.u <= 2:
+            return False
+        else:
+            high_x, _ = self.high(x)
+            low_x, _ = self.low(x)
+            return self.cluster[high_x].contains(low_x)
+
+    def successor(self, x):
+        if self.u <= 2:
+            if x == 0 and self.max == 1:
+                return 1
+            return None
+        elif self.min is not None and x < self.min:
+            return self.min
+        else:
+            high_x, _ = self.high(x)
+            low_x, _ = self.low(x)
+
+            if low_x < self.cluster[high_x].max:
+                succ_low = self.cluster[high_x].successor(low_x)
+                final_index, index_tracking = self.index(high_x, succ_low)
+                return final_index
+            else:
+                succ_high = self.summary.successor(high_x)
+                if succ_high is None:
+                    return None
+                final_index, index_tracking = self.index(succ_high, self.cluster[succ_high].min)
+                return final_index
+
+    def predecessor(self, x):
+        if self.u <= 2:
+            if x == 1 and self.min == 0:
+                return 0
+            return None
+        elif self.max is not None and x > self.max:
+            return self.max
+        else:
+            high_x, _ = self.high(x)
+            low_x, _ = self.low(x)
+
+            if low_x > self.cluster[high_x].min:
+                pred_low = self.cluster[high_x].predecessor(low_x)
+                final_index, index_tracking = self.index(high_x, pred_low)
+                return final_index
+            else:
+                pred_high = self.summary.predecessor(high_x)
+                if pred_high is None:
+                    return None
+                final_index, index_tracking = self.index(pred_high, self.cluster[pred_high].max)
+                return final_index
+
+
+# Example Usage:
+veb_tree = VanEmdeBoas(16)
+
+veb_tree.insert(3)
+veb_tree.insert(7)
+veb_tree.insert(10)
+veb_tree.insert(12)
+
+print("\nContains 7:", veb_tree.contains(7))
+print("Contains 5:", veb_tree.contains(5))
+
+print("\nSuccessor of 7:", veb_tree.successor(7))
+print("Predecessor of 7:", veb_tree.predecessor(7))
+
+
+# Sparse Table
+
+import math
+
+class SparseTable:
+    def __init__(self, arr):
+        self.n = len(arr)
+        self.log = [0] * (self.n + 1)
+        self.table = [[0] * (math.ceil(math.log2(self.n)) + 1) for _ in range(self.n)]
+        self.execution_log = []
+        self._precompute_logs()
+        self._build_table(arr)
+
+    def _precompute_logs(self):
+        self.execution_log.append("Starting log precomputation")
+        for i in range(2, self.n + 1):
+            self.log[i] = self.log[i // 2] + 1
+            self.execution_log.append(f"Computed log[{i}] = {self.log[i]}")
+
+    def _build_table(self, arr):
+        self.execution_log.append("Starting Sparse Table construction")
+        for i in range(self.n):
+            self.table[i][0] = arr[i]
+            self.execution_log.append(f"Set table[{i}][0] = {arr[i]}")
+
+        for j in range(1, math.ceil(math.log2(self.n)) + 1):
+            for i in range(self.n - (1 << j) + 1):
+                self.table[i][j] = min(self.table[i][j - 1], self.table[i + (1 << (j - 1))][j - 1])
+                self.execution_log.append(f"Computed table[{i}][{j}] = {self.table[i][j]}")
+
+    def query(self, left, right):
+        if left < 0 or right >= self.n or left > right:
+            self.execution_log.append(f"Invalid query ({left}, {right})")
+            return None
+
+        j = self.log[right - left + 1]
+        result = min(self.table[left][j], self.table[right - (1 << j) + 1][j])
+        self.execution_log.append(f"Query ({left}, {right}) => min({self.table[left][j]}, {self.table[right - (1 << j) + 1][j]}) = {result}")
+        return result
+
+    def update_table(self, index, value):
+        if index < 0 or index >= self.n:
+            self.execution_log.append(f"Update failed: Index {index} out of bounds")
+            return
+
+        self.table[index][0] = value
+        self.execution_log.append(f"Updated table[{index}][0] = {value}")
+
+        for j in range(1, math.ceil(math.log2(self.n)) + 1):
+            for i in range(self.n - (1 << j) + 1):
+                self.table[i][j] = min(self.table[i][j - 1], self.table[i + (1 << (j - 1))][j - 1])
+                self.execution_log.append(f"Recomputed table[{i}][{j}] after update")
+
+    def get_table_structure(self):
+        return {"Sparse Table": self.table, "Precomputed Log Values": self.log}
+
+    def get_execution_log(self):
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+
+# Example Usage:
+arr = [1, 3, 2, 7, 9, 11, 4, 8]
+sparse_table = SparseTable(arr)
+
+query_result_1 = sparse_table.query(2, 6)
+query_result_2 = sparse_table.query(0, 5)
+
+sparse_table.update_table(4, 5)
+
+table_data = sparse_table.get_table_structure()
+execution_log = sparse_table.get_execution_log()
+
+
+# Aho-Corasick Algorithm
+
+
+from collections import deque
+
+class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.failure_link = None
+        self.output = []
+
+class AhoCorasick:
+    def __init__(self, patterns):
+        self.root = TrieNode()
+        self.execution_log = []
+        self._build_trie(patterns)
+        self._build_failure_links()
+
+    def _build_trie(self, patterns):
+        self.execution_log.append("Starting Trie Construction")
+        for pattern in patterns:
+            node = self.root
+            for char in pattern:
+                if char not in node.children:
+                    node.children[char] = TrieNode()
+                    self.execution_log.append(f"Inserted '{char}' in Trie")
+                node = node.children[char]
+            node.output.append(pattern)
+            self.execution_log.append(f"Pattern '{pattern}' added to output list")
+
+    def _build_failure_links(self):
+        self.execution_log.append("Starting Failure Link Construction")
+        queue = deque()
+        for child in self.root.children.values():
+            child.failure_link = self.root
+            queue.append(child)
+
+        while queue:
+            node = queue.popleft()
+            for char, child in node.children.items():
+                queue.append(child)
+                failure = node.failure_link
+                while failure is not None and char not in failure.children:
+                    failure = failure.failure_link
+                child.failure_link = failure.children[char] if failure else self.root
+                child.output += child.failure_link.output
+                self.execution_log.append(f"Set failure link for '{char}'")
+
+    def search(self, text):
+        self.execution_log.append(f"Starting Search in '{text}'")
+        node = self.root
+        results = []
+        
+        for i, char in enumerate(text):
+            while node is not None and char not in node.children:
+                node = node.failure_link
+            if node is None:
+                node = self.root
+                continue
+            node = node.children[char]
+            for pattern in node.output:
+                results.append((i - len(pattern) + 1, pattern))
+                self.execution_log.append(f"Found pattern '{pattern}' at position {i - len(pattern) + 1}")
+
+        return results
+
+    def get_execution_log(self):
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+
+# Example Usage:
+patterns = ["he", "she", "hers", "his"]
+text = "she is searching for his and hers"
+
+aho_corasick = AhoCorasick(patterns)
+search_results = aho_corasick.search(text)
+
+print("\nSearch Results:", search_results)
+print("\nExecution Log:", aho_corasick.get_execution_log())
+
+
+
+# Karatsuba Algorithm
+
+
+def karatsuba(x, y):
+    """Recursive Karatsuba multiplication algorithm"""
+    if x < 10 or y < 10:  # Base case: single-digit multiplication
+        return x * y
+
+    n = max(len(str(x)), len(str(y)))
+    half_n = n // 2
+
+    # Split x and y into two parts
+    x_high, x_low = divmod(x, 10 ** half_n)
+    y_high, y_low = divmod(y, 10 ** half_n)
+
+    # Compute three multiplications
+    z0 = karatsuba(x_low, y_low)
+    z1 = karatsuba((x_low + x_high), (y_low + y_high))
+    z2 = karatsuba(x_high, y_high)
+
+    # Karatsuba formula
+    result = (z2 * 10 ** (2 * half_n)) + ((z1 - z2 - z0) * 10 ** half_n) + z0
+    
+    return result
+
+
+class KaratsubaMultiplication:
+    """Encapsulated class implementation of Karatsuba Algorithm"""
+    
+    def __init__(self, num1, num2):
+        self.num1 = num1
+        self.num2 = num2
+        self.execution_log = []
+        
+    def compute(self):
+        """Compute Karatsuba multiplication with logging"""
+        result = self._karatsuba(self.num1, self.num2)
+        self.execution_log.append(("Final Result", result))
+        return result
+
+    def _karatsuba(self, x, y):
+        """Recursive Karatsuba multiplication with detailed logging"""
+        if x < 10 or y < 10:
+            self.execution_log.append(("Base Case Multiplication", x, y, x * y))
+            return x * y
+
+        n = max(len(str(x)), len(str(y)))
+        half_n = n // 2
+
+        x_high, x_low = divmod(x, 10 ** half_n)
+        y_high, y_low = divmod(y, 10 ** half_n)
+
+        z0 = self._karatsuba(x_low, y_low)
+        z1 = self._karatsuba((x_low + x_high), (y_low + y_high))
+        z2 = self._karatsuba(x_high, y_high)
+
+        result = (z2 * 10 ** (2 * half_n)) + ((z1 - z2 - z0) * 10 ** half_n) + z0
+        
+        self.execution_log.append(("Karatsuba Step", x, y, result))
+        return result
+
+    def get_execution_log(self):
+        """Retrieve detailed execution steps"""
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+
+# Example Usage:
+num1 = 12345678
+num2 = 87654321
+
+karatsuba_instance = KaratsubaMultiplication(num1, num2)
+final_result = karatsuba_instance.compute()
+
+print("\nFinal Karatsuba Multiplication Result:", final_result)
+print("\nExecution Log:", karatsuba_instance.get_execution_log())
+
+
+# Circular Buffer
+
+class CircularBuffer:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.buffer = [None] * capacity
+        self.head = 0
+        self.tail = 0
+        self.size = 0
+        self.execution_log = []
+
+    def is_empty(self):
+        empty_status = self.size == 0
+        self.execution_log.append(("Checked if Buffer is Empty", empty_status))
+        return empty_status
+
+    def is_full(self):
+        full_status = self.size == self.capacity
+        self.execution_log.append(("Checked if Buffer is Full", full_status))
+        return full_status
+
+    def enqueue(self, value):
+        if self.is_full():
+            self.execution_log.append(f"Enqueue Failed: Buffer is Full (Attempted value: {value})")
+            return False
+
+        self.buffer[self.tail] = value
+        self.execution_log.append(f"Enqueued {value} at position {self.tail}")
+        self.tail = (self.tail + 1) % self.capacity
+        self.size += 1
+        self.execution_log.append(("Buffer Size Updated", self.size))
+        return True
+
+    def dequeue(self):
+        if self.is_empty():
+            self.execution_log.append("Dequeue Failed: Buffer is Empty")
+            return None
+
+        value = self.buffer[self.head]
+        self.buffer[self.head] = None
+        self.execution_log.append(f"Dequeued {value} from position {self.head}")
+        self.head = (self.head + 1) % self.capacity
+        self.size -= 1
+        self.execution_log.append(("Buffer Size Updated", self.size))
+        return value
+
+    def peek(self):
+        if self.is_empty():
+            self.execution_log.append("Peek Failed: Buffer is Empty")
+            return None
+        
+        peek_value = self.buffer[self.head]
+        self.execution_log.append(("Peeked at Front Element", peek_value))
+        return peek_value
+
+    def get_buffer_structure(self):
+        buffer_state = {
+            "Buffer Data": self.buffer[:],
+            "Head Position": self.head,
+            "Tail Position": self.tail,
+            "Current Size": self.size
+        }
+        self.execution_log.append(("Retrieved Buffer Structure", buffer_state))
+        return buffer_state
+
+    def get_execution_log(self):
+        execution_data = {
+            "Execution Steps": self.execution_log,
+            "Total Steps Recorded": len(self.execution_log)
+        }
+        return execution_data
+
+    def clear(self):
+        self.buffer = [None] * self.capacity
+        self.head = 0
+        self.tail = 0
+        self.size = 0
+        self.execution_log.append("Buffer Cleared")
+
+    def available_space(self):
+        """Returns the number of available slots in the buffer."""
+        free_space = self.capacity - self.size
+        self.execution_log.append(("Checked Available Space", free_space))
+        return free_space
+
+    def reverse_buffer(self):
+        """Reverses the buffer's contents while maintaining cyclic structure."""
+        reversed_data = [None] * self.capacity
+        temp = self.head
+        for i in range(self.size):
+            reversed_data[i] = self.buffer[temp]
+            temp = (temp + 1) % self.capacity
+        self.buffer = reversed_data
+        self.head = 0
+        self.tail = self.size
+        self.execution_log.append(("Reversed Buffer Content", self.buffer[:]))
+
+
+# Example Usage:
+cb = CircularBuffer(5)
+
+cb.enqueue(10)
+cb.enqueue(20)
+cb.enqueue(30)
+cb.dequeue()
+cb.enqueue(40)
+cb.enqueue(50)
+cb.enqueue(60)  # Should fail since the buffer is full
+cb.dequeue()
+cb.peek()
+
+print("\nCircular Buffer State:", cb.get_buffer_structure())
+print("\nAvailable Space:", cb.available_space())
+
+cb.reverse_buffer()
+print("\nReversed Buffer State:", cb.get_buffer_structure())
+
+print("\nExecution Log:", cb.get_execution_log())
+
+
+
+# Longest Palindromic Substring
+
+class Manacher:
+    def __init__(self, s):
+        self.original = s
+        self.processed = self._transform_string(s)
+        self.n = len(self.processed)
+        self.palindrome_lengths = [0] * self.n
+        self.execution_log = []
+        self.center = 0
+        self.right = 0
+        self.longest_palindrome = ""
+
+    def _transform_string(self, s):
+        """Transforms input string to handle even-length cases."""
+        transformed = "^#" + "#".join(s) + "#$"
+        self.execution_log.append(("Transformed String", transformed))
+        return transformed
+
+    def compute_longest_palindrome(self):
+        """Manacher’s Algorithm for finding longest palindromic substring."""
+        self.execution_log.append("Starting computation for longest palindrome.")
+
+        for i in range(1, self.n - 1):
+            mirror = 2 * self.center - i
+            
+            if i < self.right:
+                self.palindrome_lengths[i] = min(self.right - i, self.palindrome_lengths[mirror])
+                self.execution_log.append((f"Mirroring at index {i}", f"Mirrored Length: {self.palindrome_lengths[i]}"))
+
+            while self.processed[i + self.palindrome_lengths[i] + 1] == self.processed[i - self.palindrome_lengths[i] - 1]:
+                self.palindrome_lengths[i] += 1
+                self.execution_log.append(("Expanding Palindrome", i, self.palindrome_lengths[i]))
+
+            if i + self.palindrome_lengths[i] > self.right:
+                self.center, self.right = i, i + self.palindrome_lengths[i]
+                self.execution_log.append(("Updated Center & Right Boundaries", self.center, self.right))
+
+        max_length, center_index = max((val, idx) for idx, val in enumerate(self.palindrome_lengths))
+        start = (center_index - max_length) // 2  # Convert back to original index
+        self.longest_palindrome = self.original[start:start + max_length]
+
+        self.execution_log.append(("Longest Palindromic Substring Found", self.longest_palindrome))
+        return self.longest_palindrome
+
+    def query_substring(self, start, end):
+        """Checks if a given substring is palindromic."""
+        if start < 0 or end >= len(self.original) or start > end:
+            self.execution_log.append(("Invalid Query", start, end))
+            return None
+
+        substring = self.original[start:end+1]
+        is_palindrome = substring == substring[::-1]
+        self.execution_log.append(("Checked Substring", substring, "Is Palindrome:", is_palindrome))
+        return is_palindrome
+
+    def get_execution_log(self):
+        """Retrieves execution steps."""
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+    def get_full_structure(self):
+        """Retrieves the full data structure of palindrome computations."""
+        return {
+            "Processed String": self.processed,
+            "Palindrome Lengths": self.palindrome_lengths,
+            "Original Input": self.original,
+            "Execution Log": self.execution_log
+        }
+
+
+# Example Usage:
+text = "cbbd"
+manacher_instance = Manacher(text)
+longest_palindrome = manacher_instance.compute_longest_palindrome()
+
+print("\nLongest Palindromic Substring:", longest_palindrome)
+print("\nQuerying 'bb' for Palindrome:", manacher_instance.query_substring(1, 2))
+print("\nFull Structure:", manacher_instance.get_full_structure())
+print("\nExecution Log:", manacher_instance.get_execution_log())
+
+
+# Sudoku Solver
+
+
+class SudokuSolver:
+    def __init__(self, board):
+        self.board = board
+        self.execution_log = []
+        self.size = 9
+        self.subgrid_size = 3
+
+    def solve(self):
+        """Solves the Sudoku puzzle using backtracking."""
+        self.execution_log.append("Starting Sudoku Solver")
+        if self._backtrack():
+            self.execution_log.append("Sudoku Solved Successfully")
+            return self.board
+        else:
+            self.execution_log.append("No Solution Found")
+            return None
+
+    def _backtrack(self):
+        """Recursive function to solve Sudoku using backtracking."""
+        empty_cell = self._find_empty()
+        if not empty_cell:
+            return True  # Puzzle solved
+        
+        row, col = empty_cell
+        for num in range(1, 10):
+            if self._is_valid(num, row, col):
+                self.board[row][col] = num
+                self.execution_log.append(f"Placed {num} at ({row}, {col})")
+
+                if self._backtrack():
+                    return True
+                
+                self.board[row][col] = 0
+                self.execution_log.append(f"Backtracked at ({row}, {col})")
+
+        return False
+
+    def _find_empty(self):
+        """Finds an empty cell in the board."""
+        for row in range(self.size):
+            for col in range(self.size):
+                if self.board[row][col] == 0:
+                    return row, col
+        return None
+
+    def _is_valid(self, num, row, col):
+        """Checks if placing 'num' in (row, col) is valid."""
+        if num in self.board[row]:  # Check row
+            return False
+        
+        if num in [self.board[i][col] for i in range(self.size)]:  # Check column
+            return False
+
+        box_row, box_col = row // self.subgrid_size * self.subgrid_size, col // self.subgrid_size * self.subgrid_size
+        for i in range(self.subgrid_size):
+            for j in range(self.subgrid_size):
+                if self.board[box_row + i][box_col + j] == num:
+                    return False
+        
+        return True
+
+    def validate_board(self):
+        """Validates the initial Sudoku board setup."""
+        for row in range(self.size):
+            row_values = [num for num in self.board[row] if num != 0]
+            if len(row_values) != len(set(row_values)):  # Check duplicate numbers in rows
+                self.execution_log.append(f"Invalid Row: {row}")
+                return False
+
+        for col in range(self.size):
+            col_values = [self.board[row][col] for row in range(self.size) if self.board[row][col] != 0]
+            if len(col_values) != len(set(col_values)):  # Check duplicate numbers in columns
+                self.execution_log.append(f"Invalid Column: {col}")
+                return False
+
+        for box_row in range(0, self.size, self.subgrid_size):
+            for box_col in range(0, self.size, self.subgrid_size):
+                subgrid_values = []
+                for i in range(self.subgrid_size):
+                    for j in range(self.subgrid_size):
+                        value = self.board[box_row + i][box_col + j]
+                        if value != 0:
+                            subgrid_values.append(value)
+                if len(subgrid_values) != len(set(subgrid_values)):  # Check duplicate numbers in subgrid
+                    self.execution_log.append(f"Invalid Subgrid at ({box_row}, {box_col})")
+                    return False
+        
+        return True
+
+    def get_execution_log(self):
+        """Retrieves execution steps for debugging."""
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+    def display_board(self):
+        """Displays the Sudoku board."""
+        print("\nCurrent Sudoku Board:")
+        for row in self.board:
+            print(" ".join(str(cell) if cell != 0 else "." for cell in row))
+
+
+# Example Usage:
+puzzle = [
+    [5, 3, 0, 0, 7, 0, 0, 0, 0],
+    [6, 0, 0, 1, 9, 5, 0, 0, 0],
+    [0, 9, 8, 0, 0, 0, 0, 6, 0],
+    [8, 0, 0, 0, 6, 0, 0, 0, 3],
+    [4, 0, 0, 8, 0, 3, 0, 0, 1],
+    [7, 0, 0, 0, 2, 0, 0, 0, 6],
+    [0, 6, 0, 0, 0, 0, 2, 8, 0],
+    [0, 0, 0, 4, 1, 9, 0, 0, 5],
+    [0, 0, 0, 0, 8, 0, 0, 7, 9]
+]
+
+solver = SudokuSolver(puzzle)
+
+if solver.validate_board():
+    solved_board = solver.solve()
+    solver.display_board()
+else:
+    print("\nInvalid Sudoku Board Configuration")
+
+print("\nExecution Log:", solver.get_execution_log())
+
+
+# Permutation
+
+
+class PermutationGenerator:
+    def __init__(self, elements):
+        self.elements = elements
+        self.execution_log = []
+        self.results = []
+        self.used = [False] * len(elements)
+
+    def generate(self):
+        """Generates all permutations using recursive backtracking."""
+        self.execution_log.append("Starting permutation computation.")
+        self._backtrack([], self.used)
+        self.execution_log.append("Completed permutation computation.")
+        return self.results
+
+    def _backtrack(self, path, used):
+        """Recursive function to explore permutations."""
+        if len(path) == len(self.elements):
+            self.results.append(path[:])
+            self.execution_log.append(("Permutation Found", path[:]))
+            return
+        
+        for i in range(len(self.elements)):
+            if used[i]:  # Skip already used elements
+                continue
+            
+            used[i] = True
+            path.append(self.elements[i])
+            self.execution_log.append(("Added Element", self.elements[i], "Current Path", path[:]))
+
+            self._backtrack(path, used)
+
+            used[i] = False
+            path.pop()
+            self.execution_log.append(("Backtracked", path[:]))
+
+    def query_permutation(self, target):
+        """Checks if a specific permutation exists."""
+        exists = target in self.results
+        self.execution_log.append(("Checked Permutation", target, "Exists:", exists))
+        return exists
+
+    def get_execution_log(self):
+        """Retrieves execution steps."""
+        return {"Execution Steps": self.execution_log, "Total Steps": len(self.execution_log)}
+
+    def get_all_permutations(self):
+        """Retrieves all computed permutations."""
+        return {"Total Permutations": len(self.results), "Permutations": self.results}
+
+
+# Example Usage:
+elements = [1, 2, 3]
+perm_generator = PermutationGenerator(elements)
+
+all_permutations = perm_generator.generate()
+print("\nAll Permutations:", all_permutations)
+
+query_result = perm_generator.query_permutation([3, 1, 2])
+print("\nQuerying if [3, 1, 2] exists:", query_result)
+
+execution_log = perm_generator.get_execution_log()
+print("\nExecution Log:", execution_log)
+
+
+# SubSet
+
+class SubsetGenerator:
+    def __init__(self, elements):
+        self.elements = elements
+        self.execution_log = []
+        self.results = []
+
+    def generate(self):
+        """Generates all subsets using recursive backtracking."""
+        self.execution_log.append("Starting subset computation.")
+        self._backtrack(0, [])
+        self.execution_log.append("Completed subset computation.")
+        return self.results
+
+    def _backtrack(self, index, path):
+        """Recursive function to explore subsets."""
+        self.results.append(path[:])
+        self.execution_log.append(("Subset Found", path[:]))
+
+        for i in range(index, len(self.elements)):
+            path.append(self.elements[i])
+            self.execution_log.append(("Added Element", self.elements[i], "Current Path", path[:]))
+
+            self._backtrack(i + 1, path)
+
+            path.pop()
+            self.execution_log.append(("Backtracked", path[:]))
+
+    def query_subset(self, target):
+        """Checks if a specific subset exists with structured validation."""
+        if not isinstance(target, list):
+            self.execution_log.append(("Invalid Query Type", target, "Expected a list"))
+            return False
+        
+        exists = target in self.results
+        self.execution_log.append(("Checked Subset", target, "Exists:", exists))
+        
+        query_analysis = {
+            "Requested Subset": target,
+            "Exists": exists,
+            "Subset Length": len(target),
+            "Total Computed Subsets": len(self.results),
+            "Execution Log": len(self.execution_log),
+        }
+
+        return query_analysis
+
+    def get_execution_log(self):
+        """Retrieves execution steps with detailed insights."""
+        execution_data = {
+            "Execution Steps": self.execution_log,
+            "Total Steps Recorded": len(self.execution_log),
+            "Operations Breakdown": {
+                "Subset Computations": sum(1 for log in self.execution_log if "Subset Found" in log),
+                "Element Additions": sum(1 for log in self.execution_log if "Added Element" in log),
+                "Backtracking Operations": sum(1 for log in self.execution_log if "Backtracked" in log),
+            }
+        }
+
+        return execution_data
+
+    def get_all_subsets(self):
+        """Retrieves all subsets with structured data representation."""
+        subset_statistics = {
+            "Total Subsets Generated": len(self.results),
+            "Largest Subset Length": max((len(subset) for subset in self.results), default=0),
+            "Smallest Subset Length": min((len(subset) for subset in self.results), default=0),
+            "Computed Subsets": self.results,
+        }
+
+        self.execution_log.append(("Retrieved All Subsets", subset_statistics))
+        return subset_statistics
+
+
+# Example Usage:
+elements = [1, 2, 3]
+subset_generator = SubsetGenerator(elements)
+
+subset_generator.generate()
+
+query_result = subset_generator.query_subset([1, 3])
+print("\nQuerying if [1, 3] exists:", query_result)
+
+execution_log = subset_generator.get_execution_log()
+print("\nExecution Log:", execution_log)
+
+all_subsets = subset_generator.get_all_subsets()
+print("\nSubset Statistics:", all_subsets)
+
